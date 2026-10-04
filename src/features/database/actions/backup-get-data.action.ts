@@ -1,5 +1,5 @@
 "use server"
-import {userAction} from "@/lib/safe-actions/actions";
+import {ActionError, userAction} from "@/lib/safe-actions/actions";
 import {z} from "zod";
 import {db} from "@/db";
 import {and, count, eq, inArray, isNull} from "drizzle-orm";
@@ -7,6 +7,7 @@ import * as drizzleDb from "@/db";
 import {getOrganizationChannels} from "@/db/services/notification-channel";
 import {getOrganizationStorageChannels} from "@/db/services/storage-channel";
 import {getHealthLast12hLogs} from "@/db/services/healthcheck";
+import {assertCanReadDatabase} from "@/features/database/utils/database-acl";
 
 export const getDatabaseDataAction = userAction
     .inputSchema(
@@ -16,6 +17,11 @@ export const getDatabaseDataAction = userAction
     )
     .action(async ({parsedInput}) => {
         const {databaseId} = parsedInput;
+        try {
+            await assertCanReadDatabase(databaseId);
+        } catch {
+            throw new ActionError("Not authorized");
+        }
 
         const database = await db.query.database.findFirst({
             where: and(
@@ -26,7 +32,8 @@ export const getDatabaseDataAction = userAction
                 project: true,
                 retentionPolicy: true,
                 alertPolicies: true,
-                storagePolicies: true
+                storagePolicies: true,
+                agent: true,
             }
         });
 

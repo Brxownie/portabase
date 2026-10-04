@@ -1,4 +1,4 @@
-"use server";
+import "server-only";
 
 import { getOrganization } from "@/lib/auth/auth";
 import { db } from "@/db";

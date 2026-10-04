@@ -6,9 +6,10 @@ import {formatDateLastContact} from "@/utils/date-formatting";
 import {AgentCardKey} from "@/features/agents/components/agent-card-key";
 import {AgentWithDatabases} from "@/db/schema/08_agent";
 import {useQuery} from "@tanstack/react-query";
+import {useRouter} from "next/navigation";
+import {useEffect, useRef} from "react";
 import {getAgentAction} from "@/features/agents/actions/agents.action";
 import {AgentOverrideUrlForm} from "@/features/agents/components/agent-override-url-form";
-import {generateEdgeKey} from "@/utils/edge_key";
 import {
     Accordion,
     AccordionContent,
@@ -63,14 +64,21 @@ export const AgentContentPage = ({edgeKey, agent: initialAgent, canDeleteDatabas
     const supportsDatabaseConfig = agentSupportsDatabaseConfig(agent.version);
     const unsupportedVersionHint = `Requires agent version ${MIN_DATABASE_CONFIG_AGENT_VERSION} or newer.`;
 
-    const { data: edgeKeyValue } = useQuery({
-        queryKey: ["edge-key", agent.id, agent.overrideUrl],
-        queryFn: () =>
-            agent.overrideUrl
-                ? generateEdgeKey(agent.overrideUrl, agent.id)
-                : Promise.resolve(edgeKey),
-        initialData: edgeKey,
-    });
+    // The edge key is built server-side (master key never reaches the client). When the polled
+    // overrideUrl diverges from the one the server rendered, ask Next to re-render the page so
+    // the `edgeKey` prop is rebuilt for the new URL.
+    const router = useRouter();
+    const refreshedFor = useRef<string | null>(initialAgent.overrideUrl ?? null);
+    const currentOverrideUrl = agent.overrideUrl ?? null;
+    useEffect(() => {
+        if (
+            currentOverrideUrl !== (initialAgent.overrideUrl ?? null) &&
+            refreshedFor.current !== currentOverrideUrl
+        ) {
+            refreshedFor.current = currentOverrideUrl;
+            router.refresh();
+        }
+    }, [currentOverrideUrl, initialAgent.overrideUrl, router]);
 
     return (
         <div className="space-y-10">
@@ -124,7 +132,7 @@ export const AgentContentPage = ({edgeKey, agent: initialAgent, canDeleteDatabas
                             <div className="flex flex-col gap-4">
                                 <AgentOverrideUrlForm agent={agent} />
                                 <AgentCardKey
-                                    edgeKey={edgeKeyValue}
+                                    edgeKey={edgeKey}
                                     agentName={agent.name}
                                 />
                             </div>
@@ -145,6 +153,7 @@ export const AgentContentPage = ({edgeKey, agent: initialAgent, canDeleteDatabas
                         supportsDatabaseConfig ? (
                             <DatabaseConfigModal
                                 agentId={agent.id}
+                                agentVersion={agent.version}
                                 trigger={
                                     <Button>
                                         <Plus className="h-4 w-4 mr-2" />

@@ -1,4 +1,4 @@
-"use server";
+import "server-only";
 import { mkdir, unlink } from "fs/promises";
 import path from "path";
 import {
@@ -16,6 +16,16 @@ import { env } from "@/env.mjs";
 
 const BASE_DIR = path.join(env.PRIVATE_PATH!, "/uploads");
 
+/** `rel` inside `base`: paths reported by agents must not escape the channel's directory. */
+function under(base: string, rel: string): string {
+  const root = path.resolve(base);
+  const full = path.resolve(path.join(base, rel));
+  if (!full.startsWith(root + path.sep)) {
+    throw new Error("Path is outside the local storage directory");
+  }
+  return full;
+}
+
 export async function uploadLocal(
   config: { baseDir?: string },
   input: { data: StorageUploadInput; metadata?: StorageMetaData },
@@ -24,7 +34,7 @@ export async function uploadLocal(
     ? path.join(process.cwd(), config.baseDir ?? "")
     : BASE_DIR;
 
-  const fullPath = path.join(base, input.data.path);
+  const fullPath = under(base, input.data.path);
   const dir = path.dirname(fullPath);
 
   await mkdir(dir, { recursive: true });
@@ -80,7 +90,7 @@ export async function getLocal(
   const base = config.baseDir
     ? path.join(process.cwd(), config.baseDir ?? "")
     : BASE_DIR;
-  const filePath = path.join(base, input.data.path);
+  const filePath = under(base, input.data.path);
 
   if (!fs.existsSync(filePath)) {
     return {
@@ -134,7 +144,7 @@ export async function deleteLocal(
   const base = config.baseDir
     ? path.join(process.cwd(), config.baseDir ?? "")
     : BASE_DIR;
-  const fullPath = path.join(base, input.data.path);
+  const fullPath = under(base, input.data.path);
 
   await unlink(fullPath);
   return {
@@ -150,7 +160,7 @@ export async function checkLocal(
   const base = config.baseDir
     ? path.join(process.cwd(), config.baseDir)
     : BASE_DIR;
-  const fullPath = path.join(base, input.data.path);
+  const fullPath = under(base, input.data.path);
   try {
     await fs.promises.stat(fullPath);
     return { success: true, provider: "local" };
@@ -189,8 +199,8 @@ export async function copyLocal(
       ? path.join(process.cwd(), config.baseDir ?? "")
       : BASE_DIR;
 
-  const sourcePath = path.join(base, input.data.from);
-  const destinationPath = path.join(base, input.data.to);
+  const sourcePath = under(base, input.data.from);
+  const destinationPath = under(base, input.data.to);
 
   const dir = path.dirname(destinationPath);
   await mkdir(dir, { recursive: true });

@@ -3,18 +3,17 @@
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from "@/components/ui/dialog";
 
-import { generateEdgeKey } from "@/utils/edge_key";
 import { PropsWithChildren } from "react";
-import { getServerUrl } from "@/utils/get-server-url";
 import { CodeSnippet } from "@/components/common/code-snippet";
 import {Agent} from "@/db/schema/08_agent";
 
 export type agentRegistrationDialogProps = PropsWithChildren<{
     agent: Agent;
+    edgeKey: string;
 }>;
 
 export function AgentModalKey(props: agentRegistrationDialogProps) {
-    const edge_key = generateEdgeKey(props.agent.overrideUrl ?? getServerUrl(), props.agent.id);
+    const edge_key = props.edgeKey;
     const command = `portabase agent create"${props.agent.name}" --key ${edge_key}`;
 
     return (

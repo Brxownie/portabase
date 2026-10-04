@@ -335,11 +335,10 @@ export const auth = betterAuth({
                   .where(eq(drizzleDb.schemas.user.email, payload.email))
                   .limit(1);
                 if (existing) {
-                  return {
-                    id: existing.id,
-                    name: existing.name || payload.name,
-                    displayName: payload.email,
-                  };
+                  throw new APIError("BAD_REQUEST", {
+                    message:
+                      "An account with this email already exists. Sign in to add a passkey.",
+                  });
                 }
                 const newUser = await (
                   ctx as any

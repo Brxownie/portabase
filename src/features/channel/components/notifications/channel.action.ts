@@ -4,11 +4,24 @@ import { z } from "zod";
 import { ServerActionResult } from "@/types/action-type";
 import * as drizzleDb from "@/db";
 import { userAction } from "@/lib/safe-actions/actions";
+import { assertCanManageOrganization } from "@/lib/acl/organization-guard";
+import { User } from "@/db/schema/02_user";
 import { NotificationChannel } from "@/db/schema/09_notification-channel";
 import { db } from "@/db";
 import { and, eq } from "drizzle-orm";
 import { withUpdatedAt } from "@/db/utils";
 import { NotificationChannelFormSchema } from "@/features/channel/schemas/channel-form.schema";
+import { dispatchNotification } from "@/features/notifications/utils/notifications.dispatch";
+import type { EventPayload } from "@/features/notifications/types";
+
+/** Instance channels: instance admins; organization channels: that organization's owners/admins. */
+async function authorizeChannel(user: User, id: string) {
+  const channel = await db.query.notificationChannel.findFirst({
+    columns: { organizationId: true },
+    where: eq(drizzleDb.schemas.notificationChannel.id, id),
+  });
+  await assertCanManageOrganization(user, channel?.organizationId);
+}
 
 export const addNotificationChannelAction = userAction
   .inputSchema(
@@ -20,8 +33,10 @@ export const addNotificationChannelAction = userAction
   .action(
     async ({
       parsedInput,
+      ctx,
     }): Promise<ServerActionResult<NotificationChannel>> => {
       const { organizationId, data } = parsedInput;
+      await assertCanManageOrganization(ctx.user, organizationId);
       try {
         const [channel] = await db
           .insert(drizzleDb.schemas.notificationChannel)
@@ -79,8 +94,10 @@ export const removeNotificationChannelAction = userAction
   .action(
     async ({
       parsedInput,
+      ctx,
     }): Promise<ServerActionResult<NotificationChannel>> => {
       const { organizationId, notificationChannelId } = parsedInput;
+      await authorizeChannel(ctx.user, notificationChannelId);
 
       try {
         if (organizationId) {
@@ -156,8 +173,10 @@ export const updateNotificationChannelAction = userAction
   .action(
     async ({
       parsedInput,
+      ctx,
     }): Promise<ServerActionResult<NotificationChannel>> => {
       const { id, data } = parsedInput;
+      await authorizeChannel(ctx.user, id);
 
       try {
         const [channel] = await db
@@ -198,3 +217,21 @@ export const updateNotificationChannelAction = userAction
       }
     },
   );
+
+export const testNotificationChannelAction = userAction
+  .inputSchema(
+    z.object({
+      organizationId: z.string().optional(),
+      data: NotificationChannelFormSchema,
+    }),
+  )
+  .action(async ({ parsedInput, ctx }) => {
+    const { organizationId, data } = parsedInput;
+    await assertCanManageOrganization(ctx.user, organizationId);
+    const payload: EventPayload = {
+      title: "Test Channel",
+      message: `We are testing channel ${data.name}`,
+      level: "info",
+    };
+    return dispatchNotification(payload, undefined, undefined, organizationId, data);
+  });

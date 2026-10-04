@@ -1,4 +1,4 @@
-"use server";
+import "server-only";
 import {eq} from "drizzle-orm";
 import {dispatchViaProvider} from "@/features/channel/components/notifications";
 import type {EventPayload, DispatchResult, EventKind} from "@/features/notifications/types";

@@ -4,11 +4,23 @@ import { z } from "zod";
 import { ServerActionResult } from "@/types/action-type";
 import * as drizzleDb from "@/db";
 import { userAction } from "@/lib/safe-actions/actions";
+import { assertCanManageOrganization } from "@/lib/acl/organization-guard";
+import { User } from "@/db/schema/02_user";
 import { db } from "@/db";
 import { and, eq } from "drizzle-orm";
 import { withUpdatedAt } from "@/db/utils";
 import { StorageChannelFormSchema } from "@/features/channel/schemas/channel-form.schema";
 import { StorageChannel } from "@/db/schema/12_storage-channel";
+import { dispatchStorage } from "@/features/storages/utils/storages.dispatch";
+
+/** Instance channels: instance admins; organization channels: that organization's owners/admins. */
+async function authorizeChannel(user: User, id: string) {
+  const channel = await db.query.storageChannel.findFirst({
+    columns: { organizationId: true },
+    where: eq(drizzleDb.schemas.storageChannel.id, id),
+  });
+  await assertCanManageOrganization(user, channel?.organizationId);
+}
 
 export const addStorageChannelAction = userAction
   .inputSchema(
@@ -18,8 +30,9 @@ export const addStorageChannelAction = userAction
     }),
   )
   .action(
-    async ({ parsedInput }): Promise<ServerActionResult<StorageChannel>> => {
+    async ({ parsedInput, ctx }): Promise<ServerActionResult<StorageChannel>> => {
       const { organizationId, data } = parsedInput;
+      await assertCanManageOrganization(ctx.user, organizationId);
 
       try {
         const [channel] = await db
@@ -74,8 +87,9 @@ export const removeStorageChannelAction = userAction
     }),
   )
   .action(
-    async ({ parsedInput }): Promise<ServerActionResult<StorageChannel>> => {
+    async ({ parsedInput, ctx }): Promise<ServerActionResult<StorageChannel>> => {
       const { organizationId, id } = parsedInput;
+      await authorizeChannel(ctx.user, id);
 
       try {
         if (organizationId) {
@@ -145,8 +159,9 @@ export const updateStorageChannelAction = userAction
     }),
   )
   .action(
-    async ({ parsedInput }): Promise<ServerActionResult<StorageChannel>> => {
+    async ({ parsedInput, ctx }): Promise<ServerActionResult<StorageChannel>> => {
       const { id, data } = parsedInput;
+      await authorizeChannel(ctx.user, id);
 
       try {
         const [channel] = await db
@@ -187,3 +202,15 @@ export const updateStorageChannelAction = userAction
       }
     },
   );
+
+export const testStorageChannelAction = userAction
+  .inputSchema(
+    z.object({
+      organizationId: z.string().optional(),
+      data: StorageChannelFormSchema,
+    }),
+  )
+  .action(async ({ parsedInput, ctx }) => {
+    await assertCanManageOrganization(ctx.user, parsedInput.organizationId);
+    return dispatchStorage({ action: "ping" }, undefined, undefined, parsedInput.data);
+  });

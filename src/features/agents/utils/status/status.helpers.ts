@@ -17,8 +17,9 @@ import {getDatabaseStorageChannels, PingDatabaseStorageChannels} from "./storage
 import {applyStorageEncryption} from "./storage-encryption.helpers";
 import {applyConfigEncryption} from "./config-encryption.helpers";
 import {isAgentVersionAtLeast, MIN_AGENT_VERSION_DB_CONFIG} from "@/utils/status-crypto";
-import {handleFailedRestoration} from "./restoration.helpers";
+import {buildResticRestore, handleFailedRestoration} from "./restoration.helpers";
 import {resolveBackupCron} from "@/features/database/utils/policy-resolution";
+import {engineFromWire, resolveMethodConflict} from "@/features/database/utils/backup-method";
 
 const log = logger.child({module: "api/agent/status/helpers"});
 
@@ -50,7 +51,7 @@ export async function handleDatabases(body: Body, agent: Agent, lastContact: Dat
             storages: storages,
             encrypt: settings.encryption,
             data: {
-                backup: {action: backupAction, cron},
+                backup: {action: backupAction, cron, engine: database.backupEngine},
                 restore: {action: restoreAction, file: UrlBackup, metaFile: urlMeta, size: backupSize},
             },
             config,
@@ -71,6 +72,7 @@ export async function handleDatabases(body: Body, agent: Agent, lastContact: Dat
         let urlBackup: string | null = null;
         let urlMeta: string | null = null
         let backupSize: number | null = null
+        let resticRestore: Record<string, unknown> | null = null
 
         if (!existingDatabase) {
             if (!isUUID(db.generatedId)) {
@@ -92,7 +94,8 @@ export async function handleDatabases(body: Body, agent: Agent, lastContact: Dat
                     dbms: db.dbms as EDbmsSchema,
                     agentDatabaseId: db.generatedId,
                     lastContact: db.pingStatus ? lastContact : null,
-                    healthErrorCount: null
+                    healthErrorCount: null,
+                    backupEngine: db.dbms === "files" ? (engineFromWire(db.method) ?? "archive") : "archive",
                 })
                 .returning();
 
@@ -114,6 +117,14 @@ export async function handleDatabases(body: Body, agent: Agent, lastContact: Dat
                 databasesResponse.push(entry);
             }
         } else {
+            // Non-files sources implicitly announce "archive": a files source turned into another dbms conflicts too.
+            const methodConflict = resolveMethodConflict(
+                existingDatabase.backupEngine,
+                db.dbms === "files" ? db.method : "archive",
+            );
+            if (methodConflict !== existingDatabase.methodConflict) {
+                log.warn({name: "handleDatabases", databaseId: existingDatabase.id, announced: methodConflict, stored: existingDatabase.backupEngine}, "backup method conflict changed");
+            }
 
             const [databaseUpdated] = await dbClient
                 .update(drizzleDb.schemas.database)
@@ -123,6 +134,7 @@ export async function handleDatabases(body: Body, agent: Agent, lastContact: Dat
                     dbms: db.dbms as EDbmsSchema,
                     lastContact: db.pingStatus ? lastContact : existingDatabase.lastContact,
                     healthErrorCount: db.pingStatus ? null : existingDatabase.healthErrorCount,
+                    methodConflict,
                 }))
                 .where(eq(drizzleDb.schemas.database.id, existingDatabase.id))
                 .returning();
@@ -156,7 +168,7 @@ export async function handleDatabases(body: Body, agent: Agent, lastContact: Dat
                 }
             })
 
-            if (activeBackup && activeBackup.status === "waiting") {
+            if (activeBackup && activeBackup.status === "waiting" && !methodConflict) {
                 backupAction = true
 
                 await dbClient
@@ -173,67 +185,89 @@ export async function handleDatabases(body: Body, agent: Agent, lastContact: Dat
                     continue;
                 }
 
-                const input: StorageInput = {
-                    action: "get",
-                    data: {
-                        path: restoration.backupStorage.path,
-                        signedUrl: true,
-                    },
-                    metadata: {
-                        storageId: restoration.backupStorage.storageChannelId,
-                        fileKind: "backups"
-                    }
-                };
-
-                const inputMeta: StorageInput = {
-                    action: "get",
-                    data: {
-                        path: `${restoration.backupStorage.path}.meta`,
-                        signedUrl: true,
-                    },
-                    metadata: {
-                        storageId: restoration.backupStorage.storageChannelId,
-                        fileKind: "backups"
-                    }
-                };
-
-
-                try {
-                    const result = await dispatchStorage(input, undefined, restoration.backupStorage.storageChannelId);
-                    const resultMeta = await dispatchStorage(inputMeta, undefined, restoration.backupStorage.storageChannelId);
-
-                    if (result.file && typeof (result.file as any).destroy === "function") {
-                        (result.file as any).destroy();
-                    }
-                    if (resultMeta.file && typeof (resultMeta.file as any).destroy === "function") {
-                        (resultMeta.file as any).destroy();
-                    }
-
-                    if (result.success) {
-                        urlBackup = result.url ?? null;
-                        urlMeta = resultMeta.url ?? null
-                        backupSize = restoration.backupStorage.size
-                    } else {
-                        await dbClient
-                            .update(drizzleDb.schemas.restoration)
-                            .set(withUpdatedAt({status: "failed"}))
-                            .where(eq(drizzleDb.schemas.restoration.id, restoration.id));
-
-                        const errorMessage = "Failed to get backup URL";
-                        log.error({error: errorMessage, name: "handleDatabases"}, "Restoration failed");
-
-                        await handleFailedRestoration(restoration.id, databaseUpdated.id, errorMessage);
-
-                        continue;
-                    }
-                } catch (err) {
-                    log.error({error: err, name: "handleDatabases"}, "Restoration crashed unexpectedly");
+                if (restoration.backupStorage.engine === "sync") {
                     await dbClient
                         .update(drizzleDb.schemas.restoration)
                         .set(withUpdatedAt({status: "failed"}))
                         .where(eq(drizzleDb.schemas.restoration.id, restoration.id));
-                    await handleFailedRestoration(restoration.id, databaseUpdated.id, "Restoration crashed unexpectedly");
+                    await handleFailedRestoration(restoration.id, databaseUpdated.id, "A sync replica cannot be restored.");
                     continue;
+                }
+
+                if (restoration.backupStorage.engine === "restic") {
+                    const built = await buildResticRestore(restoration.backupStorage, body.version, masterKey);
+                    if ("error" in built) {
+                        await dbClient
+                            .update(drizzleDb.schemas.restoration)
+                            .set(withUpdatedAt({status: "failed"}))
+                            .where(eq(drizzleDb.schemas.restoration.id, restoration.id));
+                        await handleFailedRestoration(restoration.id, databaseUpdated.id, built.error);
+                        continue;
+                    }
+                    resticRestore = built.payload;
+                } else {
+                    const input: StorageInput = {
+                        action: "get",
+                        data: {
+                            path: restoration.backupStorage.path,
+                            signedUrl: true,
+                        },
+                        metadata: {
+                            storageId: restoration.backupStorage.storageChannelId,
+                            fileKind: "backups"
+                        }
+                    };
+
+                    const inputMeta: StorageInput = {
+                        action: "get",
+                        data: {
+                            path: `${restoration.backupStorage.path}.meta`,
+                            signedUrl: true,
+                        },
+                        metadata: {
+                            storageId: restoration.backupStorage.storageChannelId,
+                            fileKind: "backups"
+                        }
+                    };
+
+
+                    try {
+                        const result = await dispatchStorage(input, undefined, restoration.backupStorage.storageChannelId);
+                        const resultMeta = await dispatchStorage(inputMeta, undefined, restoration.backupStorage.storageChannelId);
+
+                        if (result.file && typeof (result.file as any).destroy === "function") {
+                            (result.file as any).destroy();
+                        }
+                        if (resultMeta.file && typeof (resultMeta.file as any).destroy === "function") {
+                            (resultMeta.file as any).destroy();
+                        }
+
+                        if (result.success) {
+                            urlBackup = result.url ?? null;
+                            urlMeta = resultMeta.url ?? null
+                            backupSize = restoration.backupStorage.size
+                        } else {
+                            await dbClient
+                                .update(drizzleDb.schemas.restoration)
+                                .set(withUpdatedAt({status: "failed"}))
+                                .where(eq(drizzleDb.schemas.restoration.id, restoration.id));
+
+                            const errorMessage = "Failed to get backup URL";
+                            log.error({error: errorMessage, name: "handleDatabases"}, "Restoration failed");
+
+                            await handleFailedRestoration(restoration.id, databaseUpdated.id, errorMessage);
+
+                            continue;
+                        }
+                    } catch (err) {
+                        log.error({error: err, name: "handleDatabases"}, "Restoration crashed unexpectedly");
+                        await dbClient
+                            .update(drizzleDb.schemas.restoration)
+                            .set(withUpdatedAt({status: "failed"}))
+                            .where(eq(drizzleDb.schemas.restoration.id, restoration.id));
+                        await handleFailedRestoration(restoration.id, databaseUpdated.id, "Restoration crashed unexpectedly");
+                        continue;
+                    }
                 }
 
                 await dbClient
@@ -246,7 +280,8 @@ export async function handleDatabases(body: Body, agent: Agent, lastContact: Dat
                 project: existingDatabase.project,
             } as DatabaseWith);
             const storages = await getDatabaseStorageChannels(databaseUpdated.id)
-            const entry = formatDatabase(databaseUpdated, backupAction, restoreAction, urlBackup, storages, urlMeta, backupSize, resolvedCron);
+            const entry = formatDatabase(databaseUpdated, backupAction, restoreAction, urlBackup, storages, urlMeta, backupSize, methodConflict ? null : resolvedCron);
+            if (resticRestore) Object.assign(entry.data.restore, resticRestore);
             applyStorageEncryption(entry, body.version, masterKey, agent.id);
             applyConfigEncryption(entry, body.version, masterKey, agent.id);
             databasesResponse.push(entry);

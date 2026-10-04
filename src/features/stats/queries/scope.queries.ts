@@ -1,3 +1,4 @@
+import "server-only";
 import { db } from "@/db";
 import { and, eq, inArray } from "drizzle-orm";
 import { currentUser } from "@/lib/auth/current-user";

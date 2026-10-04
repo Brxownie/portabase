@@ -1,5 +1,5 @@
 "use server"
-import {userAction} from "@/lib/safe-actions/actions";
+import {systemAdminAction} from "@/lib/safe-actions/actions";
 import {z} from "zod";
 import {ServerActionResult} from "@/types/action-type";
 import {db} from "@/db";
@@ -120,7 +120,8 @@ export async function updateAgentOrganizationsService(
     }
 }
 
-export const updateAgentOrganizationsAction = userAction
+// Sharing an agent with organizations is only offered on the (admin) agent page.
+export const updateAgentOrganizationsAction = systemAdminAction
     .inputSchema(
         z.object({
             data: z.array(z.string()),

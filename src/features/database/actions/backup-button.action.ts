@@ -1,6 +1,7 @@
 "use server";
 
 import {z} from "zod";
+import {eq} from "drizzle-orm";
 import {db} from "@/db";
 import {ServerActionResult} from "@/types/action-type";
 import * as drizzleDb from "@/db";
@@ -14,6 +15,21 @@ export const backupButtonAction = userAction.inputSchema(z.string()).action(asyn
   console.log("Creating backup for databaseId:", parsedInput);
 
   try {
+        const database = await db.query.database.findFirst({
+            where: eq(drizzleDb.schemas.database.id, parsedInput),
+            columns: {methodConflict: true},
+        });
+        if (database?.methodConflict) {
+            return {
+                success: false,
+                actionError: {
+                    message: "Backups are suspended: databases.json announces a different backup method for this source.",
+                    status: 409,
+                    messageParams: {databaseId: parsedInput},
+                },
+            };
+        }
+
         const [createdBackup] = await db
             .insert(drizzleDb.schemas.backup)
             .values({

@@ -1,4 +1,4 @@
-"use server";
+import "server-only";
 import { ServerActionResult } from "@/types/action-type";
 import { auth } from "@/lib/auth/auth";
 import { zPassword, zString } from "@/lib/zod";

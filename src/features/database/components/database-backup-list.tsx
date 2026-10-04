@@ -71,11 +71,12 @@ export const DatabaseBackupList = (props: DatabaseBackupListProps) => {
                             databaseId: backup.databaseId,
                             backupId: backup.id,
                         });
+                        const inner = backupDeleted?.data;
                         return {
-                            success: backupDeleted?.data?.success,
-                            message: backupDeleted?.data?.success
-                                ? backupDeleted?.data?.actionSuccess?.message
-                                : "Failed to delete backup.",
+                            success: inner?.success,
+                            message: inner?.success
+                                ? inner.actionSuccess?.message
+                                : inner?.actionError?.message ?? "Failed to delete backup.",
                         };
                     }
                     return {

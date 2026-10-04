@@ -4,8 +4,9 @@ import {z} from "zod";
 import {db} from "@/db";
 import {and, eq, isNull} from "drizzle-orm";
 import * as drizzleDb from "@/db";
-import {userAction} from "@/lib/safe-actions/actions";
+import {ActionError, userAction} from "@/lib/safe-actions/actions";
 import {PolicyScopeSchema} from "@/features/database/schemas/policy-scope.schema";
+import {assertCanManagePolicyScope} from "@/features/database/utils/database-acl";
 
 export async function updateBackupPolicyService(
     scope: {type: "database" | "project"; id: string},
@@ -49,16 +50,10 @@ export async function updateBackupPolicyService(
 export const updateBackupPolicyAction = userAction
     .inputSchema(z.object({scope: PolicyScopeSchema, backupPolicy: z.string()}))
     .action(async ({parsedInput}) => {
+        // An empty policy stops the backups and drops the scope's retention.
+        await assertCanManagePolicyScope(parsedInput.scope).catch(() => {
+            throw new ActionError("Not authorized");
+        });
         const updated = await updateBackupPolicyService(parsedInput.scope, parsedInput.backupPolicy);
-        return {data: updated};
-    });
-
-export const updateDatabaseBackupPolicyAction = userAction
-    .inputSchema(z.object({databaseId: z.string(), backupPolicy: z.string()}))
-    .action(async ({parsedInput}) => {
-        const updated = await updateBackupPolicyService(
-            {type: "database", id: parsedInput.databaseId},
-            parsedInput.backupPolicy,
-        );
         return {data: updated};
     });

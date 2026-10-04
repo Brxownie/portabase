@@ -13,6 +13,8 @@ import {
 import { assertCanManageAgentDatabases } from "@/features/database/utils/database-acl";
 import { getMasterServerKeyContent } from "@/features/agents/utils/keys.server";
 import { encryptConfigSecrets } from "@/features/database/utils/credential-crypto";
+import { unsupportedSnapshotPattern } from "@/features/database/utils/backup-engine";
+import { engineFromWire, splitMethod } from "@/features/database/utils/backup-method";
 
 export const upsertDatabaseConfigAction = userAction
   .inputSchema(
@@ -39,7 +41,8 @@ export const upsertDatabaseConfigAction = userAction
       throw new ActionError("Encryption key unavailable; cannot store credentials");
     }
 
-    const nextConfig = pruneAgentConfig(data.config as Record<string, unknown>);
+    // The method lives in backupEngine, never in the stored config.
+    const { config: nextConfig, method } = splitMethod(pruneAgentConfig(data.config as Record<string, unknown>));
 
     if (databaseId) {
       const existing = await db.query.database.findFirst({
@@ -49,6 +52,16 @@ export const upsertDatabaseConfigAction = userAction
         ),
       });
       if (!existing) throw new ActionError("Database not found");
+
+      const engine = existing.backupEngine;
+      const changesMethod =
+        (data.dbms !== "files" && engine !== "archive") ||
+        (data.dbms === "files" && method !== undefined && engineFromWire(method) !== engine);
+      if (changesMethod) throw new ActionError("The backup method cannot be changed after creation.");
+      const badPattern = engine === "restic" ? unsupportedSnapshotPattern(nextConfig) : undefined;
+      if (badPattern) {
+        throw new ActionError(`Exclude pattern "${badPattern}": brace patterns {a,b} are not supported in Snapshots mode.`);
+      }
 
       const config = encryptConfigSecrets(
         data.dbms,
@@ -69,6 +82,12 @@ export const upsertDatabaseConfigAction = userAction
       return updated;
     }
 
+    const engine = data.dbms === "files" ? (engineFromWire(method) ?? "archive") : "archive";
+    const badPattern = engine === "restic" ? unsupportedSnapshotPattern(nextConfig) : undefined;
+    if (badPattern) {
+      throw new ActionError(`Exclude pattern "${badPattern}": brace patterns {a,b} are not supported in Snapshots mode.`);
+    }
+
     const config = encryptConfigSecrets(data.dbms, nextConfig, undefined, masterKey);
 
     const [created] = await db
@@ -78,6 +97,7 @@ export const upsertDatabaseConfigAction = userAction
         name: data.name,
         dbms: data.dbms,
         config,
+        backupEngine: engine,
         ...(agentDatabaseId ? { agentDatabaseId } : {}),
       })
       .returning();

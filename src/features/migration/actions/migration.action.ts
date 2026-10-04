@@ -1,5 +1,5 @@
 "use server"
-import {userAction} from "@/lib/safe-actions/actions";
+import {ActionError, userAction} from "@/lib/safe-actions/actions";
 import {ServerActionResult} from "@/types/action-type";
 import {z} from "zod";
 import {db} from "@/db";
@@ -10,6 +10,7 @@ import {v4 as uuidv4} from "uuid";
 import {getTodayISODate} from "@/utils/date-formatting";
 import {withUpdatedAt} from "@/db/utils";
 import {getBackupFolderName} from "@/utils/file-prefix";
+import {assertCanReadDatabase} from "@/features/database/utils/database-acl";
 
 export const migrationAction = userAction.inputSchema(
     z.object({
@@ -19,6 +20,19 @@ export const migrationAction = userAction.inputSchema(
 ).action(async ({ parsedInput }): Promise<ServerActionResult<{}>> => {
 
     const { targetDatabaseId, backupIds } = parsedInput;
+
+    // The target and every source backup's database must belong to the caller's organization.
+    const sources = await db.query.backup.findMany({
+        where: inArray(drizzleDb.schemas.backup.id, backupIds),
+        columns: {databaseId: true},
+    });
+    for (const databaseId of new Set([targetDatabaseId, ...sources.map((b) => b.databaseId)])) {
+        try {
+            await assertCanReadDatabase(databaseId);
+        } catch {
+            throw new ActionError("Not authorized");
+        }
+    }
 
     let hasError = false;
 
@@ -60,6 +74,17 @@ export const migrationAction = userAction.inputSchema(
                 success: false,
                 actionError: {
                     message: "Some backups were not found",
+                    status: 400,
+                },
+            };
+        }
+
+        // Only archives are files that can be copied: snapshots and sync replicas are not.
+        if (backups.some((b) => b.storages.some((s) => s.engine !== "archive" && s.deletedAt === null))) {
+            return {
+                success: false,
+                actionError: {
+                    message: "Snapshot and sync backups cannot be migrated.",
                     status: 400,
                 },
             };

@@ -1,5 +1,5 @@
 "use server";
-import {userAction} from "@/lib/safe-actions/actions";
+import {systemAdminAction} from "@/lib/safe-actions/actions";
 import {z} from "zod";
 import {ServerActionResult} from "@/types/action-type";
 import {Member} from "better-auth/plugins";
@@ -10,7 +10,7 @@ import {withUpdatedAt} from "@/db/utils";
 import {RoleSchemaMember} from "@/features/organizations/schemas/member.schema";
 
 
-export const updateMemberRoleAdminAction = userAction.inputSchema(
+export const updateMemberRoleAdminAction = systemAdminAction.inputSchema(
     z.object({
         memberId: z.string(),
         organizationId: z.string(),

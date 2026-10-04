@@ -1,4 +1,4 @@
-"use server";
+import "server-only";
 import { render } from "@react-email/render";
 import nodemailer from "nodemailer";
 import type { EventPayload, DispatchResult } from '@/features/notifications/types';

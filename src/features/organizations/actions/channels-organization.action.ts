@@ -1,5 +1,5 @@
 "use server"
-import {userAction} from "@/lib/safe-actions/actions";
+import {systemAdminAction} from "@/lib/safe-actions/actions";
 import {z} from "zod";
 import {ServerActionResult} from "@/types/action-type";
 import {db} from "@/db";
@@ -8,8 +8,8 @@ import * as drizzleDb from "@/db";
 import {NotificationChannelWith} from "@/db/schema/09_notification-channel";
 import {StorageChannelWith} from "@/db/schema/12_storage-channel";
 
-
-export const updateNotificationChannelsOrganizationAction = userAction
+// Linking instance channels to organizations: (admin) channel pages and onboarding only.
+export const updateNotificationChannelsOrganizationAction = systemAdminAction
     .inputSchema(
         z.object({
             data: z.array(z.string()),
@@ -80,7 +80,7 @@ export const updateNotificationChannelsOrganizationAction = userAction
     });
 
 
-export const updateStorageChannelsOrganizationAction = userAction
+export const updateStorageChannelsOrganizationAction = systemAdminAction
     .inputSchema(
         z.object({
             data: z.array(z.string()),

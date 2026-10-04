@@ -3,7 +3,7 @@ import {DataTable} from "@/components/common/data-table";
 import {
     notificationLogsColumns,
 } from "@/features/notifications/components/notification-log-columns";
-import {NotificationLogWithRelations} from "@/db/services/notification-log";
+import type {NotificationLogWithRelations} from "@/db/services/notification-log";
 
 
 type NotificationsLogsListProps = {

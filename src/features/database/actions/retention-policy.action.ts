@@ -8,7 +8,8 @@ import {
     RetentionSettingsSchema
 } from "@/features/database/schemas/retention-policy.schema";
 import {PolicyScopeSchema, scopeOwner} from "@/features/database/schemas/policy-scope.schema";
-import {userAction} from "@/lib/safe-actions/actions";
+import {ActionError, userAction} from "@/lib/safe-actions/actions";
+import {assertCanManagePolicyScope} from "@/features/database/utils/database-acl";
 
 
 export const updateOrCreateBackupRetentionPolicyAction = userAction
@@ -20,6 +21,11 @@ export const updateOrCreateBackupRetentionPolicyAction = userAction
     )
     .action(async ({parsedInput}) => {
         const {scope, settings} = parsedInput;
+        try {
+            await assertCanManagePolicyScope(scope);
+        } catch {
+            throw new ActionError("Not authorized");
+        }
         const owner = scopeOwner(scope);
         const ownerCol = scope.type === "database"
             ? drizzleDb.schemas.retentionPolicy.databaseId

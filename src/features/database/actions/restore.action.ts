@@ -1,5 +1,5 @@
 "use server"
-import {userAction} from "@/lib/safe-actions/actions";
+import {ActionError, userAction} from "@/lib/safe-actions/actions";
 import {z} from "zod";
 import {ServerActionResult} from "@/types/action-type";
 import * as drizzleDb from "@/db";
@@ -7,6 +7,21 @@ import * as drizzleDb from "@/db";
 import {db} from "@/db";
 import {and, eq} from "drizzle-orm";
 import {Backup, Restoration} from "@/db/schema/07_database";
+import {assertCanOperateDatabase} from "@/features/database/utils/database-acl";
+
+/** The restoration's database must be one the caller can operate on (owner/admin of its organization). */
+async function authorize(restorationId: string): Promise<void> {
+    try {
+        const restoration = await db.query.restoration.findFirst({
+            columns: {databaseId: true},
+            where: eq(drizzleDb.schemas.restoration.id, restorationId),
+        });
+        if (!restoration?.databaseId) throw new Error("Restoration not found");
+        await assertCanOperateDatabase(restoration.databaseId);
+    } catch {
+        throw new ActionError("Not authorized");
+    }
+}
 
 export const deleteRestoreAction = userAction
     .inputSchema(
@@ -15,6 +30,7 @@ export const deleteRestoreAction = userAction
         })
     )
     .action(async ({parsedInput}): Promise<ServerActionResult<Backup>> => {
+        await authorize(parsedInput.restorationId);
         try {
             await db
                 .delete(drizzleDb.schemas.restoration)
@@ -52,6 +68,7 @@ export const rerunRestorationAction = userAction
         })
     )
     .action(async ({parsedInput}): Promise<ServerActionResult<Restoration>> => {
+        await authorize(parsedInput.restorationId);
         try {
             const [updatedRestoration] = await db
                 .update(drizzleDb.schemas.restoration)

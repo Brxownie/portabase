@@ -5,6 +5,7 @@ export type databaseAgent = {
     dbms: EDbmsSchema;
     generatedId: string;
     pingStatus: boolean;
+    method?: string; // files sources from databases.json only (agent ≥ 1.22.0)
 };
 
 export type Body = {

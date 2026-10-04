@@ -34,3 +34,26 @@ export function agentSupportsDatabaseConfig(
 ): boolean {
     return isVersionAtLeast(version, MIN_DATABASE_CONFIG_AGENT_VERSION);
 }
+
+/**
+ * Minimum agent version that supports the `files` source type.
+ */
+export const MIN_FILES_AGENT_VERSION = "1.22.0";
+
+export function agentSupportsFiles(
+    version: string | null | undefined,
+): boolean {
+    return isVersionAtLeast(version, MIN_FILES_AGENT_VERSION);
+}
+
+/**
+ * Minimum agent version that supports Snapshots (restic) for `files` sources.
+ * Same release as `files` (P0, P1 and P2 ship together).
+ */
+export const MIN_RESTIC_AGENT_VERSION = "1.22.0";
+
+export function agentSupportsRestic(
+    version: string | null | undefined,
+): boolean {
+    return isVersionAtLeast(version, MIN_RESTIC_AGENT_VERSION);
+}

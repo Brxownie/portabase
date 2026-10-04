@@ -1,7 +1,7 @@
 "use client";
 
 import type {AppColumnDef as ColumnDef} from "@/components/common/table-features";
-import {NotificationLogWithRelations} from "@/db/services/notification-log";
+import type {NotificationLogWithRelations} from "@/db/services/notification-log";
 import {humanReadableDate} from "@/utils/date-formatting";
 import {CheckCircle2, XCircle} from "lucide-react";
 import {Badge} from "@/components/ui/badge";

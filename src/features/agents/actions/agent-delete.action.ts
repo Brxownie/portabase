@@ -8,6 +8,7 @@ import {db} from "@/db";
 import * as drizzleDb from "@/db";
 import {Agent} from "@/db/schema/08_agent";
 import {userAction} from "@/lib/safe-actions/actions";
+import {assertCanManageOrganization} from "@/lib/acl/organization-guard";
 import {zString} from "@/lib/zod";
 import {withUpdatedAt} from "@/db/utils";
 
@@ -119,7 +120,13 @@ export const deleteAgentAction = userAction
             organizationIds: z.array(zString()).optional(),
         })
     )
-    .action(async ({parsedInput}): Promise<ServerActionResult<Agent>> => {
+    .action(async ({parsedInput, ctx}): Promise<ServerActionResult<Agent>> => {
+        // The agent is archived for every organization: the rule follows its owner, not the given organizationId.
+        const agent = await db.query.agent.findFirst({
+            where: eq(drizzleDb.schemas.agent.id, parsedInput.agentId),
+            columns: {organizationId: true},
+        });
+        await assertCanManageOrganization(ctx.user, agent?.organizationId);
         try {
             const deletedAgent = await deleteAgentService(parsedInput);
 

@@ -4,12 +4,14 @@ import {
   text,
   pgEnum,
   bigint,
+  integer,
   index,
   timestamp,
 } from "drizzle-orm/pg-core";
 import { timestamps } from "@/db/schema/00_common";
 import { StorageChannel, storageChannel } from "@/db/schema/12_storage-channel";
 import { backup } from "@/db/schema/07_database";
+import { backupEngineEnum } from "@/db/schema/types";
 import { relations, sql } from "drizzle-orm";
 import { createSelectSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -40,6 +42,11 @@ export const backupStorage = pgTable(
     path: text("path"),
     size: bigint("size", { mode: "number" }),
     checksum: text("checksum"),
+    // archive: `path` is a file; restic: `path` is a snapshot id (P2); sync: `path` is the replica directory.
+    engine: backupEngineEnum("engine").notNull().default("archive"),
+    // sync only: rclone counters of the run (size = bytes transferred).
+    filesTransferred: integer("files_transferred"),
+    filesDeleted: integer("files_deleted"),
     presence: backupPresenceEnum("presence").notNull().default("unknown"),
     lastCheckedAt: timestamp("last_checked_at", { withTimezone: true }),
     lastCheckError: text("last_check_error"),

@@ -33,10 +33,12 @@ import {
 import { DatabaseConfigFields } from "@/features/database/components/config/database-config-fields";
 import { upsertDatabaseConfigAction } from "@/features/database/actions/database-config.action";
 import { DB_SECRET_FIELDS } from "@/features/database/utils/credential-fields";
+import { agentSupportsFiles, MIN_FILES_AGENT_VERSION } from "@/features/agents/utils/version";
+import { engineFromWire, wireFromEngine, withMethod } from "@/features/database/utils/backup-method";
 
-type Props = { agentId: string; database?: Database; trigger: ReactNode };
+type Props = { agentId: string; agentVersion?: string | null; database?: Database; trigger: ReactNode };
 
-export const DatabaseConfigModal = ({ agentId, database, trigger }: Props) => {
+export const DatabaseConfigModal = ({ agentId, agentVersion, database, trigger }: Props) => {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<"form" | "json">("form");
@@ -50,7 +52,9 @@ export const DatabaseConfigModal = ({ agentId, database, trigger }: Props) => {
             form: {
               name: database.name,
               dbms: database.dbms,
-              config: (database.config as Record<string, unknown>) ?? {},
+              config: database.dbms === "files"
+                ? withMethod(database.config as Record<string, unknown> | null, wireFromEngine(database.backupEngine))
+                : ((database.config as Record<string, unknown>) ?? {}),
             },
             generatedId: database.agentDatabaseId ?? undefined,
           }
@@ -72,6 +76,10 @@ export const DatabaseConfigModal = ({ agentId, database, trigger }: Props) => {
   const watched = form.watch();
   const lockedDbms = database?.dbms;
 
+  const typeOptions = databaseTypeOptions.filter(
+    (o) => o.value !== "files" || lockedDbms === "files" || agentSupportsFiles(agentVersion),
+  );
+
   const initialSignature = useMemo(
     () => agentConfigSignature(initial.form, initial.generatedId),
     [initial],
@@ -91,6 +99,15 @@ export const DatabaseConfigModal = ({ agentId, database, trigger }: Props) => {
       const { form: mapped, generatedId: gid } = fromAgentConfigJson(parsed);
       if (lockedDbms && mapped.dbms !== lockedDbms) {
         setJsonError(`"type" cannot be changed after creation (expected "${lockedDbms}")`);
+        return;
+      }
+      const mappedMethod = (mapped.config.options as Record<string, unknown> | undefined)?.method;
+      if (database && lockedDbms === "files" && engineFromWire(mappedMethod ?? "archive") !== database.backupEngine) {
+        setJsonError(`"options.method" cannot be changed after creation (expected "${wireFromEngine(database.backupEngine)}")`);
+        return;
+      }
+      if (mapped.dbms === "files" && !lockedDbms && !agentSupportsFiles(agentVersion)) {
+        setJsonError(`Files sources require agent ≥ ${MIN_FILES_AGENT_VERSION}`);
         return;
       }
       // @ts-expect-error — reset target is a union across discriminated dbms variants
@@ -240,7 +257,7 @@ export const DatabaseConfigModal = ({ agentId, database, trigger }: Props) => {
                         <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {databaseTypeOptions.map((o) => (
+                        {typeOptions.map((o) => (
                           <SelectItem key={o.value} value={o.value}>
                             <span className="flex items-center gap-2">
                               <Image
@@ -266,7 +283,7 @@ export const DatabaseConfigModal = ({ agentId, database, trigger }: Props) => {
                 )}
               />
 
-              <DatabaseConfigFields dbms={dbms} form={form} />
+              <DatabaseConfigFields dbms={dbms} form={form} editing={!!database} />
             </TabsContent>
 
             <TabsContent value="json" className="pt-2">

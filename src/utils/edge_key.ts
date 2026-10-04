@@ -1,4 +1,4 @@
-"use server"
+import "server-only";
 import {getMasterServerKeyContent} from "@/features/agents/utils/keys.server";
 
 export async function generateEdgeKey(serverUrl: string, agentId: string): Promise<string> {

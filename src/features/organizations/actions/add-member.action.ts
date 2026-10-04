@@ -5,9 +5,9 @@ import { z } from "zod";
 import { auth } from "@/lib/auth/auth";
 import { MemberRoleType } from "@/types/common";
 import { Member } from "better-auth/plugins/organization";
-import { userAction } from "@/lib/safe-actions/actions";
+import {systemAdminAction} from "@/lib/safe-actions/actions";
 
-export const addMemberOrganizationAction = userAction
+export const addMemberOrganizationAction = systemAdminAction
   .inputSchema(
     z.object({
       userId: z.string(),

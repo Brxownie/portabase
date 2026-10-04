@@ -43,6 +43,7 @@ export default async function RoutePage(
       retentionPolicy: true,
       alertPolicies: true,
       storagePolicies: true,
+      agent: true,
     },
   });
 

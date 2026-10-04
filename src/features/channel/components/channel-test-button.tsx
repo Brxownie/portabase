@@ -6,15 +6,16 @@ import {toast} from "sonner";
 
 import {Button} from "@/components/ui/button";
 import {NotificationChannel} from "@/db/schema/09_notification-channel";
-import {dispatchNotification} from "@/features/notifications/utils/notifications.dispatch";
-import {EventPayload} from "@/features/notifications/types";
+import {testNotificationChannelAction} from "@/features/channel/components/notifications/channel.action";
+import {testStorageChannelAction} from "@/features/channel/components/storages/channel.action";
 import {useIsMobile} from "@/hooks/use-mobile";
 import {cn} from "@/lib/utils";
 import {StorageChannel} from "@/db/schema/12_storage-channel";
 import {ChannelKind} from "@/features/channel/components/channels-helpers";
-import type {StorageInput} from "@/features/storages/types";
-import type {NotificationChannelFormType} from "@/features/channel/schemas/channel-form.schema";
-import {dispatchStorage} from "@/features/storages/utils/storages.dispatch";
+import type {
+    NotificationChannelFormType,
+    StorageChannelFormType
+} from "@/features/channel/schemas/channel-form.schema";
 import {Tooltip, TooltipContent, TooltipTrigger} from "@/components/ui/tooltip";
 
 
@@ -36,28 +37,26 @@ export const ChannelTestButton = ({channel, organizationId, kind}: NotifierTestC
     const mutation = useMutation({
         mutationFn: async () => {
             if (kind === "notification") {
-                const payload: EventPayload = {
-                    title: 'Test Channel',
-                    message: `We are testing channel ${channel.name}`,
-                    level: 'info',
-                };
-                const result = await dispatchNotification(payload, undefined, undefined, organizationId, channel as unknown as NotificationChannelFormType);
+                const result = (await testNotificationChannelAction({
+                    organizationId,
+                    data: channel as unknown as NotificationChannelFormType,
+                }))?.data;
 
-                if (result.success) {
+                if (result?.success) {
                     toast.success(result.message);
                 } else {
                     toast.error("An error occurred while testing the notification channel, check your configuration");
                 }
             } else if (kind === "storage") {
-                const input: StorageInput = {
-                    action: "ping",
-                };
-                const result = await dispatchStorage(input, undefined, undefined, channel);
+                const result = (await testStorageChannelAction({
+                    organizationId,
+                    data: channel as unknown as StorageChannelFormType,
+                }))?.data;
 
-                if (result.success) {
+                if (result?.success) {
                     toast.success("Successfully connected to storage channel");
                 } else {
-                    const responseText = result.response ? `(${result.response})` : "";
+                    const responseText = result?.response ? `(${result.response})` : "";
                     toast.error(`An error occurred while testing the storage channel, check your configuration ${responseText}`);
                 }
             } else {

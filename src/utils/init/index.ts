@@ -7,13 +7,15 @@ import {createSettingsIfNotExist} from "@/utils/init/setting";
 import {createDefaultOrganization} from "@/utils/init/organization";
 import {createDefaultUser} from "@/utils/init/user";
 import {markOnboardingDoneIfSkipped} from "@/utils/init/onboarding";
+import {startLocalStorageServers} from "@/lib/local-storage/servers";
 
 const log = logger.child({module: "init"});
 
 export async function init() {
     consoleAscii();
     log.info("====Init Functions====");
-    await getOrCreateMasterKey();
+    const masterKey = await getOrCreateMasterKey();
+    startLocalStorageServers(masterKey);
     await generateRSAKeys();
     await makeMigration();
     await createDefaultOrganization();

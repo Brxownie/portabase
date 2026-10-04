@@ -1,5 +1,3 @@
-"use server";
-
 export type Payload = {
   to: string;
   from?: string;

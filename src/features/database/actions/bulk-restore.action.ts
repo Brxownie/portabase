@@ -77,6 +77,7 @@ async function resolveLatestRestorable(projectId: string, databaseIds: string[])
                     eq(drizzleDb.schemas.backupStorage.backupId, backup.id),
                     eq(drizzleDb.schemas.backupStorage.status, "success"),
                     ne(drizzleDb.schemas.backupStorage.presence, "missing"),
+                    ne(drizzleDb.schemas.backupStorage.engine, "sync"),
                     isNull(drizzleDb.schemas.backupStorage.deletedAt),
                 ),
                 orderBy: desc(drizzleDb.schemas.backupStorage.createdAt),

@@ -8,6 +8,9 @@ import * as drizzleDb from "@/db";
 import {slugify} from "@/utils/slugify";
 import {getHealthLast12hLogs} from "@/db/services/healthcheck";
 import {maskDatabasesSecretsForClient} from "@/features/database/utils/credential-fields";
+import {generateEdgeKey} from "@/utils/edge_key";
+import {getServerUrl} from "@/utils/get-server-url";
+import {assertCanManageOrganization} from "@/lib/acl/organization-guard";
 
 const verifySlugUniqueness = async (slug: string, agentId?: string) => {
     const conditions = agentId ? and(eq(drizzleDb.schemas.agent.slug, slug), ne(drizzleDb.schemas.agent.id, agentId)) : eq(drizzleDb.schemas.agent.slug, slug);
@@ -54,10 +57,13 @@ export const createAgentAction = userAction.inputSchema(
         organizationId: z.string().optional(),
         data: AgentSchema,
     })
-).action(async ({parsedInput}) => {
+).action(async ({parsedInput, ctx}) => {
+    // The edge key returned below embeds the master key.
+    await assertCanManageOrganization(ctx.user, parsedInput.organizationId);
     const createdAgent = await createAgentService(parsedInput);
     return {
         data: createdAgent,
+        edgeKey: await generateEdgeKey(getServerUrl(), createdAgent.id),
     };
 });
 
@@ -68,7 +74,13 @@ export const updateAgentAction = userAction
             data: AgentSchema,
         })
     )
-    .action(async ({parsedInput}) => {
+    .action(async ({parsedInput, ctx}) => {
+        const agent = await db.query.agent.findFirst({
+            where: eq(drizzleDb.schemas.agent.id, parsedInput.id),
+            columns: {organizationId: true},
+        });
+        if (!agent) throw new ActionError("Agent not found");
+        await assertCanManageOrganization(ctx.user, agent.organizationId);
         const slug = slugify(parsedInput.data.name);
         await verifySlugUniqueness(slug, parsedInput.id);
 

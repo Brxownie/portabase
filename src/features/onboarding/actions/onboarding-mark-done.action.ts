@@ -1,6 +1,6 @@
 "use server";
 
-import { userAction } from "@/lib/safe-actions/actions";
+import {systemAdminAction} from "@/lib/safe-actions/actions";
 import { z } from "zod";
 import { db } from "@/db";
 import * as drizzleDb from "@/db";
@@ -8,7 +8,7 @@ import { eq } from "drizzle-orm";
 import { setActiveOrganization } from "@/lib/auth/auth";
 import { DEFAULT_ORGANIZATION_SLUG } from "@/features/organizations/constants";
 
-export const markOnboardingDoneAction = userAction
+export const markOnboardingDoneAction = systemAdminAction
   .inputSchema(z.object({}))
   .action(async () => {
     const settings = await db.query.setting.findFirst();

@@ -1,4 +1,4 @@
-"use server"
+import "server-only";
 import {Backup, DatabaseWith} from "@/db/schema/07_database";
 import {dispatchStorage} from "@/features/storages/utils/storages.dispatch";
 import type {
@@ -12,7 +12,8 @@ import * as drizzleDb from "@/db";
 import {withUpdatedAt} from "@/db/utils";
 import {eq} from "drizzle-orm";
 import {db} from "@/db";
-import {createHash} from "crypto";
+import {createHash, createHmac, timingSafeEqual} from "crypto";
+import {env} from "@/env.mjs";
 import {getServerUrl} from "@/utils/get-server-url";
 import path from "path";
 import {getBackupFolderName} from "@/utils/file-prefix";
@@ -58,7 +59,10 @@ export async function storeBackupFiles(
         return [];
     }
 
-    const path = `${getBackupFolderName()}/${database.project?.slug}/${fileName}`;
+    // `<folder>/restic` and `<folder>/sync` are served to agents (spec B): keep imports out of them.
+    const slug = database.project?.slug;
+    const projectDir = slug === "sync" || slug === "restic" ? `project-${slug}` : slug;
+    const path = `${getBackupFolderName()}/${projectDir}/${fileName}`;
     const size = file.length;
     const checksum = computeChecksum(file);
 
@@ -123,6 +127,20 @@ export async function storeBackupFiles(
 
 
 
+/**
+ * Signature of a backup download URL (`/api/files/backups`, served without a session):
+ * HMAC with PROJECT_SECRET, which agents never hold, over the channel, the path and the expiry.
+ */
+function backupUrlSignature(storageId: string, filePath: string, expires: string): string {
+    return createHmac("sha256", env.PROJECT_SECRET).update(`backups\n${storageId}\n${filePath}\n${expires}`).digest("hex");
+}
+
+export function verifyBackupUrl(storageId: string, filePath: string, expires: string, token: string): boolean {
+    const expected = Buffer.from(backupUrlSignature(storageId, filePath, expires));
+    const given = Buffer.from(token);
+    return given.length === expected.length && timingSafeEqual(given, expected) && Date.now() <= Number(expires);
+}
+
 export async function generateFileUrl(input: { data: StorageGetInput | StorageUploadInput, metadata?: StorageMetaData }): Promise<string | null> {
     const fileName = path.basename(input.data.path);
     const baseUrl = getServerUrl();
@@ -137,13 +155,11 @@ export async function generateFileUrl(input: { data: StorageGetInput | StorageUp
     });
 
     if (metadata.fileKind === "backups") {
-        const crypto = require("crypto");
-        const expiresAt = Date.now() + 60 * 1000;
-        const token = crypto.createHash("sha256").update(`${fileName}${expiresAt}`).digest("hex");
+        const expiresAt = (Date.now() + 60 * 1000).toString();
 
         params.set("path", input.data.path);
-        params.set("token", token);
-        params.set("expires", expiresAt.toString());
+        params.set("token", backupUrlSignature(metadata.storageId, input.data.path, expiresAt));
+        params.set("expires", expiresAt);
         return `${baseUrl}/api/files/${metadata.fileKind}/?${params.toString()}`
     }else if (metadata.fileKind === "images") {
         return `${baseUrl}/api/files/${metadata.fileKind}/${fileName}?${params.toString()}`

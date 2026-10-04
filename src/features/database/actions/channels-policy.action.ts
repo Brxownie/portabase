@@ -1,5 +1,5 @@
 "use server"
-import {userAction} from "@/lib/safe-actions/actions";
+import {ActionError, userAction} from "@/lib/safe-actions/actions";
 import {z} from "zod";
 import {ServerActionResult} from "@/types/action-type";
 import {db} from "@/db";
@@ -10,6 +10,27 @@ import {AlertPolicy} from "@/db/schema/10_alert-policy";
 import {PolicySchema} from "@/features/database/schemas/channels-policy.schema";
 import {StoragePolicy} from "@/db/schema/13_storage-policy";
 import {PolicyScope, PolicyScopeSchema, scopeOwner} from "@/features/database/schemas/policy-scope.schema";
+import {assertCanManagePolicyScope} from "@/features/database/utils/database-acl";
+import {getOrganization} from "@/lib/auth/auth";
+import {getOrganizationChannels} from "@/db/services/notification-channel";
+import {getOrganizationStorageChannels} from "@/db/services/storage-channel";
+
+/** Scope rights; on create/update every channel must also be one the scope's (active) organization can use. */
+async function authorize(scope: PolicyScope, channels?: { kind: "notification" | "storage"; ids: string[] }): Promise<void> {
+    try {
+        await assertCanManagePolicyScope(scope);
+        if (!channels) return;
+        const organization = await getOrganization({});
+        if (!organization) throw new Error("No active organization");
+        const usable = channels.kind === "storage"
+            ? await getOrganizationStorageChannels(organization.id)
+            : await getOrganizationChannels(organization.id);
+        const usableIds = new Set(usable.map((channel) => channel.id));
+        if (!channels.ids.every((id) => usableIds.has(id))) throw new Error("Channel not available");
+    } catch {
+        throw new ActionError("Not authorized");
+    }
+}
 
 const alertOwnerWhere = (scope: PolicyScope) =>
     scope.type === "database"
@@ -30,6 +51,7 @@ export const createAlertPoliciesAction = userAction
         })
     )
     .action(async ({parsedInput}): Promise<ServerActionResult<AlertPolicy[]>> => {
+        await authorize(parsedInput.scope, {kind: "notification", ids: parsedInput.alertPolicies.map((p) => p.channelId)});
         try {
 
             const owner = scopeOwner(parsedInput.scope);
@@ -75,6 +97,7 @@ export const updateAlertPoliciesAction = userAction
     )
     .action(async ({parsedInput}): Promise<ServerActionResult<AlertPolicy[]>> => {
         const {scope, alertPolicies} = parsedInput;
+        await authorize(scope, {kind: "notification", ids: alertPolicies.map((p) => p.channelId)});
 
         try {
 
@@ -141,6 +164,7 @@ export const deleteAlertPoliciesAction = userAction
     )
     .action(async ({parsedInput}): Promise<ServerActionResult<AlertPolicy[]>> => {
         const {scope, alertPolicies} = parsedInput;
+        await authorize(scope);
 
         try {
 
@@ -201,6 +225,7 @@ export const createStoragePoliciesAction = userAction
         })
     )
     .action(async ({parsedInput}): Promise<ServerActionResult<StoragePolicy[]>> => {
+        await authorize(parsedInput.scope, {kind: "storage", ids: parsedInput.storagePolicies.map((p) => p.channelId)});
         try {
 
             const owner = scopeOwner(parsedInput.scope);
@@ -246,6 +271,7 @@ export const updateStoragePoliciesAction = userAction
     )
     .action(async ({parsedInput}): Promise<ServerActionResult<StoragePolicy[]>> => {
         const {scope, storagePolicies} = parsedInput;
+        await authorize(scope, {kind: "storage", ids: storagePolicies.map((p) => p.channelId)});
 
         try {
 
@@ -312,6 +338,7 @@ export const deleteStoragePoliciesAction = userAction
     )
     .action(async ({parsedInput}): Promise<ServerActionResult<StoragePolicy[]>> => {
         const {scope, storagePolicies} = parsedInput;
+        await authorize(scope);
 
         try {
 

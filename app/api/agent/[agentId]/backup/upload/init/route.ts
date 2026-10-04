@@ -6,6 +6,7 @@ import { getDatabaseOrThrow, withAgentCheck } from "../../helpers";
 import { eventEmitter } from "@/lib/event";
 import { logger } from "@/lib/logger";
 import { isUUID } from "@/utils/text";
+import { getDatabaseStorageChannels } from "@/features/agents/utils/status/storage-channels.helpers";
 
 const log = logger.child({ module: "api/agent/backup/upload/init" });
 
@@ -13,6 +14,7 @@ export type Body = {
   generatedId: string;
   storageChannelId: string;
   backupId: string;
+  engine?: "archive" | "restic" | "sync";
 };
 export const POST = withAgentCheck(
   async (
@@ -43,6 +45,26 @@ export const POST = withAgentCheck(
 
       const database = await getDatabaseOrThrow(generatedId);
 
+      // The method is locked on the source: refuse any other engine, even from a buggy agent.
+      // Agents older than P2 send no engine: archive.
+      const engine = body.engine ?? "archive";
+      if (engine !== database.backupEngine) {
+        return NextResponse.json(
+          { error: `Engine "${engine}" does not match the source's backup method "${database.backupEngine}"` },
+          { status: 400 },
+        );
+      }
+
+      // Only a channel the ping assigned to this source: a row on another channel would make
+      // retention delete there and a snapshot restore ship that channel's credentials.
+      const channels = await getDatabaseStorageChannels(database.id);
+      if (!channels.some((channel) => channel.id === storageChannelId)) {
+        return NextResponse.json(
+          { error: "Storage channel is not assigned to this source" },
+          { status: 400 },
+        );
+      }
+
       const backup = await db.query.backup.findFirst({
         where: and(
           eq(drizzleDb.schemas.backup.id, backupId),
@@ -63,6 +85,7 @@ export const POST = withAgentCheck(
           backupId: backup.id,
           storageChannelId: storageChannelId,
           status: "pending",
+          engine: database.backupEngine,
         })
         .returning();
 

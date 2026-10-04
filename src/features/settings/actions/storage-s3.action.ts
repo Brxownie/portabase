@@ -5,10 +5,10 @@ import { db } from "@/db";
 import { S3FormSchema, StorageSwitchSchema } from "@/features/settings/schemas/storage-s3.schema";
 import { eq } from "drizzle-orm";
 import * as drizzleDb from "@/db";
-import {userAction} from "@/lib/safe-actions/actions";
+import {systemAdminAction} from "@/lib/safe-actions/actions";
 import {withUpdatedAt} from "@/db/utils";
 
-export const updateS3SettingsAction = userAction
+export const updateS3SettingsAction = systemAdminAction
     .inputSchema(
         z.object({
             name: z.string(),
@@ -29,7 +29,7 @@ export const updateS3SettingsAction = userAction
         };
     });
 
-export const updateStorageSettingsAction = userAction
+export const updateStorageSettingsAction = systemAdminAction
     .inputSchema(
         z.object({
             name: z.string(),

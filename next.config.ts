@@ -42,6 +42,9 @@ const nextConfig: NextConfig = {
     "*": ["./node_modules/.pnpm/@swc+helpers@*/node_modules/@swc/helpers/**/*"],
   },
   devIndicators: false,
+  // dev only: the `/storage/*` rewrites must keep the trailing slash (restic REST / WebDAV
+  // roots); Next's default 308 would strip it and rclone then creates a file, not a directory.
+  skipTrailingSlashRedirect: isDev,
   typescript: {
     ignoreBuildErrors: true,
   },
@@ -62,6 +65,14 @@ const nextConfig: NextConfig = {
       {
         source: "/tus/:path*",
         destination: "http://localhost:1080/tus/:path*",
+      },
+      {
+        source: "/storage/restic/:path(.*)",
+        destination: "http://localhost:1081/storage/restic/:path",
+      },
+      {
+        source: "/storage/sync/:path(.*)",
+        destination: "http://localhost:1082/storage/sync/:path",
       },
     ];
   },

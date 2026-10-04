@@ -82,6 +82,13 @@ export const POST = withApiKey(
           );
         }
 
+        if (backupStorage.engine === "sync") {
+          return NextResponse.json(
+              { error: "A sync replica cannot be restored." },
+              { status: 409 }
+          );
+        }
+
         const existingRestorationBackup = await db.query.restoration.findFirst({
           where: and(
               eq(drizzleDb.schemas.restoration.databaseId, id),

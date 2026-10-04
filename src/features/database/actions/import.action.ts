@@ -1,5 +1,6 @@
 "use server"
-import {userAction} from "@/lib/safe-actions/actions";
+import {ActionError, userAction} from "@/lib/safe-actions/actions";
+import {assertCanOperateDatabase} from "@/features/database/utils/database-acl";
 import {ServerActionResult} from "@/types/action-type";
 import {db} from "@/db";
 import * as drizzleDb from "@/db";
@@ -14,9 +15,13 @@ import {inspectUpload, InvalidUploadError, packToTarGz} from "@/features/databas
 export const uploadBackupAction = userAction
     .inputSchema(z.instanceof(FormData))
     .action(async ({parsedInput: formData}): Promise<ServerActionResult<Backup>> => {
+        const databaseId = formData.get("databaseId") as string;
+        // An imported archive becomes a restorable backup of that database.
+        await assertCanOperateDatabase(databaseId).catch(() => {
+            throw new ActionError("Not authorized");
+        });
         try {
             const file = formData.get("file") as File;
-            const databaseId = formData.get("databaseId") as string;
 
             const database = await db.query.database.findFirst({
                 where: and(

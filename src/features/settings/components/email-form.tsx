@@ -21,13 +21,11 @@ import {
 } from "@/features/settings/schemas/email-form.schema";
 import {PasswordInput} from "@/components/ui/password-input";
 import {
+    sendTestEmailAction,
     updateEmailSettingsAction
 } from "@/features/settings/actions/email-form.action";
 import {toast} from "sonner";
 import {useRouter} from "next/navigation";
-import {sendEmail} from "@/lib/email";
-import {render} from "@react-email/components";
-import EmailSettingsTest from "@/components/emails/email-settings-test";
 import {ButtonWithLoading} from "@/components/common/button-with-loading";
 import {Send} from "lucide-react";
 import {Switch} from "@/components/ui/switch";
@@ -73,28 +71,21 @@ export const EmailForm = (props: EmailFormProps) => {
                 return;
             }
 
-            try {
-                const email = await sendEmail({
-                    to: props.defaultValues.smtpUser,
-                    subject: "Portabase",
-                    html: await render(EmailSettingsTest(), {}),
-                    from: props.defaultValues.smtpFrom,
-                });
+            const result = await sendTestEmailAction({to: props.defaultValues.smtpUser});
 
-                if (email?.response) {
-                    toast.success("Test Email successfully sent!");
-                }
-
-                return email;
-            } catch (error: unknown) {
-                if (error instanceof Error) {
-                    toast.error(`Email sending failed: ${error.message}`);
-                } else {
-                    toast.error("Unknown error while sending test email");
-                }
-
-                throw error;
+            if (result?.serverError) {
+                toast.error(`Email sending failed: ${result.serverError}`);
+                return;
             }
+            if (result?.validationErrors) {
+                toast.error("Email sending failed: invalid recipient address");
+                return;
+            }
+            if (result?.data?.sent) {
+                toast.success("Test Email successfully sent!");
+            }
+
+            return result?.data;
         },
     });
 

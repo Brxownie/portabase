@@ -6,6 +6,7 @@ import { withUpdatedAt } from "@/db/utils";
 import { getDatabaseOrThrow, withAgentCheck } from "../../helpers";
 import { eventEmitter } from "@/lib/event";
 import { logger } from "@/lib/logger";
+import { isSnapshotId } from "@/lib/restic/repo";
 
 const log = logger.child({ module: "api/agent/backup/upload/status" });
 
@@ -16,6 +17,8 @@ export type Body = {
   path: string;
   size: number;
   backupId: string;
+  filesTransferred?: number;
+  filesDeleted?: number;
 };
 export const PATCH = withAgentCheck(
   async (
@@ -38,6 +41,14 @@ export const PATCH = withAgentCheck(
       const backupId = body.backupId;
 
       const database = await getDatabaseOrThrow(generatedId);
+
+      // A snapshot path is later passed to restic (forget, restore payload): only a full id.
+      if (database.backupEngine === "restic" && filePath && !isSnapshotId(filePath)) {
+        return NextResponse.json(
+          { error: "path is not a restic snapshot id" },
+          { status: 400 },
+        );
+      }
 
       const backup = await db.query.backup.findFirst({
         where: and(
@@ -63,10 +74,41 @@ export const PATCH = withAgentCheck(
             status: status,
             path: filePath,
             size: fileSize,
+            filesTransferred: body.filesTransferred ?? null,
+            filesDeleted: body.filesDeleted ?? null,
           }),
         )
-        .where(eq(drizzleDb.schemas.backupStorage.id, backupStorageId))
+        .where(
+          and(
+            eq(drizzleDb.schemas.backupStorage.id, backupStorageId),
+            eq(drizzleDb.schemas.backupStorage.backupId, backup.id),
+            eq(drizzleDb.schemas.backupStorage.status, "pending"),
+          ),
+        )
         .returning();
+
+      if (!backupStorage) {
+        // Only a pending row of this backup takes a status (prune forgets local snapshots of failed rows): a replay is a no-op, any other transition is refused.
+        const current = await db.query.backupStorage.findFirst({
+          where: and(
+            eq(drizzleDb.schemas.backupStorage.id, backupStorageId),
+            eq(drizzleDb.schemas.backupStorage.backupId, backup.id),
+          ),
+        });
+        if (current?.status === status) {
+          return NextResponse.json(
+            {
+              message: "Backup status successfully updated",
+              backupStorage: current,
+            },
+            { status: 200 },
+          );
+        }
+        return NextResponse.json(
+          { error: "Backup storage is not pending" },
+          { status: 409 },
+        );
+      }
 
       if (backup.storages.length > 0) {
         const hasSuccessfulStorage = backup.storages.some(

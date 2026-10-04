@@ -13,7 +13,7 @@ import {db} from "@/db";
 import {and, eq} from "drizzle-orm";
 import {zEmail, zString} from "@/lib/zod";
 import {withUpdatedAt} from "@/db/utils";
-import {userAction} from "@/lib/safe-actions/actions";
+import {ActionError, systemAdminAction} from "@/lib/safe-actions/actions";
 import {addMemberOrganizationAction} from "@/features/organizations/actions/add-member.action";
 import {sendEmail} from "@/lib/email";
 import EmailCreateUser from "@/components/emails/email-create-user";
@@ -25,7 +25,7 @@ import {logger} from "@/lib/logger";
 
 const log = logger.child({module: "features/users/actions/user"});
 
-export const createUserAction = userAction
+export const createUserAction = systemAdminAction
     .inputSchema(UserSchema)
     .action(async ({parsedInput}): Promise<ServerActionResult<User>> => {
         try {
@@ -104,7 +104,7 @@ export const createUserAction = userAction
         }
     });
 
-export const updateUserAction = userAction
+export const updateUserAction = systemAdminAction
     .inputSchema(
         z.object({
             id: zString(),
@@ -113,6 +113,14 @@ export const updateUserAction = userAction
         }),
     )
     .action(async ({parsedInput, ctx}): Promise<ServerActionResult<{}>> => {
+        // An admin must not change a superadmin's email (a password reset would then go to them).
+        const target = await db.query.user.findFirst({
+            where: eq(drizzleDb.schemas.user.id, parsedInput.id),
+            columns: {role: true},
+        });
+        if (target?.role === "superadmin" && !ctx.permissions.isSuperAdmin) {
+            throw new ActionError("You are not allowed to update this user");
+        }
         try {
             const [updatedUser] = await db
                 .update(drizzleDb.schemas.user)
@@ -155,7 +163,7 @@ export const updateUserAction = userAction
         }
     });
 
-export const setSuperAdminOwnerOfOrganizationsOwnedByUser = userAction
+export const setSuperAdminOwnerOfOrganizationsOwnedByUser = systemAdminAction
     .inputSchema(
         z.object({
             userId: z.string(),

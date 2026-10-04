@@ -1,7 +1,7 @@
 "use server";
 
 import {z} from "zod";
-import {and, inArray, isNull} from "drizzle-orm";
+import {and, inArray, isNotNull, isNull} from "drizzle-orm";
 import {db} from "@/db";
 import * as drizzleDb from "@/db";
 import {ServerActionResult} from "@/types/action-type";
@@ -29,8 +29,19 @@ export const bulkBackupAction = userAction
                 columns: {databaseId: true},
             });
             const busy = new Set(activeBackups.map((b) => b.databaseId));
-            const toQueue = databaseIds.filter((id) => !busy.has(id));
-            const skipped = [...busy].map((databaseId) => ({databaseId, reason: "backup already in progress"}));
+            const conflicted = await db.query.database.findMany({
+                where: and(
+                    inArray(drizzleDb.schemas.database.id, databaseIds),
+                    isNotNull(drizzleDb.schemas.database.methodConflict),
+                ),
+                columns: {id: true},
+            });
+            const suspended = new Set(conflicted.map((d) => d.id));
+            const toQueue = databaseIds.filter((id) => !busy.has(id) && !suspended.has(id));
+            const skipped = [
+                ...[...busy].map((databaseId) => ({databaseId, reason: "backup already in progress"})),
+                ...[...suspended].filter((id) => !busy.has(id)).map((databaseId) => ({databaseId, reason: "backup method conflict"})),
+            ];
 
             if (toQueue.length > 0) {
                 await db

@@ -5,6 +5,8 @@ export const createTransporter = (server: Server) => {
   const portNumber = Number(server.port);
   return nodemailer.createTransport({
     pool: true,
+    disableFileAccess: true,
+    disableUrlAccess: true,
     host: server.host,
     port: portNumber,
     secure: server.secure ?? portNumber === 465,

@@ -51,6 +51,17 @@ export const POST = withApiKey(
 
         const { id } = guard.data;
 
+        const database = await db.query.database.findFirst({
+          where: eq(drizzleDb.schemas.database.id, id),
+          columns: { methodConflict: true },
+        });
+        if (database?.methodConflict) {
+          return NextResponse.json(
+              { error: "Backups are suspended: databases.json announces a different backup method for this source." },
+              { status: 409 }
+          );
+        }
+
         const existingBackup = await db.query.backup.findFirst({
           where: and(
               eq(drizzleDb.schemas.backup.databaseId, id),

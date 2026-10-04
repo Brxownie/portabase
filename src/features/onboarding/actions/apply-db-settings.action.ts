@@ -3,10 +3,10 @@
 import { db } from "@/db";
 import * as drizzleDb from "@/db";
 import { eq } from "drizzle-orm";
-import { userAction } from "@/lib/safe-actions/actions";
+import {systemAdminAction} from "@/lib/safe-actions/actions";
 import { ApplyDbSettingsSchema } from "@/features/onboarding/schemas/db-settings.schema";
 
-export const applyOnboardingDbSettingsAction = userAction
+export const applyOnboardingDbSettingsAction = systemAdminAction
   .inputSchema(ApplyDbSettingsSchema)
   .action(async ({ parsedInput }) => {
     const {

@@ -1,6 +1,6 @@
 "use server"
 
-import {userAction} from "@/lib/safe-actions/actions";
+import {systemAdminAction} from "@/lib/safe-actions/actions";
 import {db} from "@/db";
 import * as drizzleDb from "@/db";
 import {eq} from "drizzle-orm";
@@ -10,7 +10,7 @@ import {z} from "zod";
 import {DefaultNotificationSchema} from "@/features/settings/schemas/notification.schema";
 import {withUpdatedAt} from "@/db/utils";
 
-export const updateNotificationSettingsAction = userAction
+export const updateNotificationSettingsAction = systemAdminAction
     .inputSchema(
         z.object({
             name: z.string(),

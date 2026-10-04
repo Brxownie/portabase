@@ -44,6 +44,8 @@ export const StorageRcloneForm = ({form}: StorageRcloneFormProps) => {
     useEffect(() => {
         if (remoteName !== soleRemote) {
             form.setValue("config.remoteName", soleRemote, {shouldValidate: true});
+            // The schema checks configText against remoteName: re-evaluate its error too.
+            void form.trigger("config.configText");
         }
     }, [soleRemote, remoteName, form]);
 

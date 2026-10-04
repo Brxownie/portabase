@@ -29,6 +29,11 @@ export function DatabaseActionsCell({backup, activeMember, isAlreadyRestore, isB
 
     if (backup.deletedAt || activeMember.role === "member") return null;
 
+    // Only archives are files: snapshots and sync replicas cannot be downloaded; replicas cannot be restored.
+    const liveStorages = backup.storages?.filter((s) => s.deletedAt === null) ?? [];
+    const canDownload = liveStorages.length === 0 || liveStorages.some((s) => s.engine === "archive");
+    const canRestore = liveStorages.length === 0 || liveStorages.some((s) => s.engine !== "sync");
+
     return (
         <div className={cn("flex items-center space-x-2")}>
             <DropdownMenu>
@@ -42,7 +47,7 @@ export function DatabaseActionsCell({backup, activeMember, isAlreadyRestore, isB
                     <DropdownMenuLabel>Actions</DropdownMenuLabel>
                     {backup.status == "success" ? (
                         <>
-                            {!isBackupOnly && (
+                            {!isBackupOnly && canRestore && (
                                 <TooltipCustom disabled={isAlreadyRestore}
                                                text="Already a restoration waiting">
                                     <DropdownMenuItem
@@ -53,11 +58,13 @@ export function DatabaseActionsCell({backup, activeMember, isAlreadyRestore, isB
                                     </DropdownMenuItem>
                                 </TooltipCustom>
                             )}
-                            <DropdownMenuItem
-                                onSelect={() => openModal("download", backup)}
-                            >
-                                <Download/> Download
-                            </DropdownMenuItem>
+                            {canDownload && (
+                                <DropdownMenuItem
+                                    onSelect={() => openModal("download", backup)}
+                                >
+                                    <Download/> Download
+                                </DropdownMenuItem>
+                            )}
                         </>
                     ) : null}
 

@@ -1,5 +1,5 @@
 "use server";
-import { userAction } from "@/lib/safe-actions/actions";
+import { ActionError, userAction } from "@/lib/safe-actions/actions";
 import { db } from "@/db";
 import { and, count, eq, inArray, isNotNull, isNull } from "drizzle-orm";
 import * as drizzleDb from "@/db";
@@ -8,11 +8,17 @@ import {
     FetchBackupsSchema,
     FetchRestorationsSchema,
 } from "@/features/database/actions/backup-list.schema";
+import { assertCanReadDatabase } from "@/features/database/utils/database-acl";
 
 export const fetchBackupsAction = userAction
     .inputSchema(FetchBackupsSchema)
     .action(async ({ parsedInput }) => {
         const { databaseId, page, pageSize, filter } = parsedInput;
+        try {
+            await assertCanReadDatabase(databaseId);
+        } catch {
+            throw new ActionError("Not authorized");
+        }
         const offset = (page - 1) * pageSize;
 
         const deletedCondition =
@@ -76,6 +82,11 @@ export const fetchRestorationsAction = userAction
     .inputSchema(FetchRestorationsSchema)
     .action(async ({ parsedInput }) => {
         const { databaseId, page, pageSize } = parsedInput;
+        try {
+            await assertCanReadDatabase(databaseId);
+        } catch {
+            throw new ActionError("Not authorized");
+        }
         const offset = (page - 1) * pageSize;
 
         const where = eq(drizzleDb.schemas.restoration.databaseId, databaseId);

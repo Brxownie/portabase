@@ -45,6 +45,7 @@ export async function getDuePresenceRows(limit: number, staleHours: number) {
     where: and(
       isNull(drizzleDb.schemas.backupStorage.deletedAt),
       eq(drizzleDb.schemas.backupStorage.status, "success"),
+      eq(drizzleDb.schemas.backupStorage.engine, "archive"),
       eq(drizzleDb.schemas.backupStorage.presence, "missing"),
       eligibleForPresenceCheck,
     ),
@@ -56,6 +57,7 @@ export async function getDuePresenceRows(limit: number, staleHours: number) {
     where: and(
       isNull(drizzleDb.schemas.backupStorage.deletedAt),
       eq(drizzleDb.schemas.backupStorage.status, "success"),
+      eq(drizzleDb.schemas.backupStorage.engine, "archive"),
       ne(drizzleDb.schemas.backupStorage.presence, "missing"),
       or(
         isNull(drizzleDb.schemas.backupStorage.lastCheckedAt),

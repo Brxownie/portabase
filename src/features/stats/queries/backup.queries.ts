@@ -1,4 +1,4 @@
-"use server";
+import "server-only";
 
 import { db } from "@/db";
 import { mvKpiBackupCounts, mvKpiEvolutionMonthly } from "@/db/schema/16_dashboard-views";

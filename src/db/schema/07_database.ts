@@ -2,7 +2,7 @@ import {pgTable, text, boolean, timestamp, uuid, integer, pgEnum, bigint, index,
 import {Agent, agent, AgentWith} from "./08_agent";
 import {Project, project} from "./06_project";
 import {relations, sql} from "drizzle-orm";
-import {dbmsEnum, statusEnum} from "./types";
+import {backupEngineEnum, dbmsEnum, statusEnum} from "./types";
 import {createSelectSchema} from "drizzle-zod";
 import {z} from "zod";
 import {timestamps} from "@/db/schema/00_common";
@@ -21,6 +21,9 @@ export const database = pgTable("databases", {
     isWaitingForBackup: boolean("is_waiting_for_backup").default(false).notNull(),
     backupToRestore: text("backup_to_restore"),
     config: jsonb("config").$type<Record<string, unknown>>(),
+    backupEngine: backupEngineEnum("backup_engine").default("archive").notNull(),
+    // Method announced by databases.json when it differs from backupEngine (locked); null otherwise.
+    methodConflict: text("method_conflict"),
     healthErrorCount: integer("health_error_count"),
     agentId: uuid("agent_id")
         .references(() => agent.id, {onDelete: "cascade"}),

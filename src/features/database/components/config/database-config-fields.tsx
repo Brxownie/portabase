@@ -7,13 +7,14 @@ import { FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessa
 import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
 import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { X } from "lucide-react";
 
-type Props = { dbms: EDbmsSchema; form: UseFormReturn<any> };
+type Props = { dbms: EDbmsSchema; form: UseFormReturn<any>; editing?: boolean };
 
-export const DatabaseConfigFields = ({ dbms, form }: Props) => {
+export const DatabaseConfigFields = ({ dbms, form, editing }: Props) => {
   const defs = databaseFieldDefs[dbms] ?? [];
   return (
     <div key={dbms} className="flex flex-col gap-4">
@@ -32,7 +33,7 @@ export const DatabaseConfigFields = ({ dbms, form }: Props) => {
                   <Switch checked={!!field.value} onCheckedChange={field.onChange} />
                 ) : def.widget === "select" ? (
                   <div className="flex items-center gap-2">
-                    <Select value={field.value ?? ""} onValueChange={field.onChange}>
+                    <Select value={field.value ?? ""} onValueChange={field.onChange} disabled={!!editing && !!def.lockedOnEdit}>
                       <SelectTrigger className="w-full">
                         <SelectValue placeholder="Select…" />
                       </SelectTrigger>
@@ -55,6 +56,13 @@ export const DatabaseConfigFields = ({ dbms, form }: Props) => {
                       </Button>
                     ) : null}
                   </div>
+                ) : def.widget === "lines" ? (
+                  <Textarea
+                    rows={4}
+                    placeholder={def.placeholder}
+                    value={Array.isArray(field.value) ? field.value.join("\n") : ""}
+                    onChange={(e) => field.onChange(e.target.value.split("\n"))}
+                  />
                 ) : (
                   <Input
                     {...field}

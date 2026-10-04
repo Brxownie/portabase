@@ -1,4 +1,4 @@
-import { createHmac } from "crypto";
+import { createHmac, timingSafeEqual } from "crypto";
 import { env } from "@/env.mjs";
 
 export function signPasskeyContext(name: string, email: string): string {
@@ -21,8 +21,18 @@ export function verifyPasskeyContext(
   const expected = createHmac("sha256", env.PROJECT_SECRET)
     .update(payload)
     .digest("base64url");
-  if (sig !== expected) return null;
-  const data = JSON.parse(Buffer.from(payload, "base64url").toString());
-  if (data.exp < Date.now()) return null;
-  return { name: data.name, email: data.email };
+  const sigBuf = Buffer.from(sig);
+  const expectedBuf = Buffer.from(expected);
+  if (
+    sigBuf.length !== expectedBuf.length ||
+    !timingSafeEqual(sigBuf, expectedBuf)
+  )
+    return null;
+  try {
+    const data = JSON.parse(Buffer.from(payload, "base64url").toString());
+    if (typeof data?.exp !== "number" || data.exp < Date.now()) return null;
+    return { name: data.name, email: data.email };
+  } catch {
+    return null;
+  }
 }

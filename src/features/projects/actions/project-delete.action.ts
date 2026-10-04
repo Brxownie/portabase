@@ -1,6 +1,7 @@
 "use server";
 
 import {userAction} from "@/lib/safe-actions/actions";
+import {assertCanManageOrganization} from "@/lib/acl/organization-guard";
 import { logger } from "@/lib/logger";
 import {z} from "zod";
 import {v4 as uuidv4} from "uuid";
@@ -58,7 +59,12 @@ export async function archiveProjectService(projectId: string): Promise<Archived
     return updatedProject;
 }
 
-export const deleteProjectAction = userAction.inputSchema(z.string()).action(async ({parsedInput}): Promise<ServerActionResult<ArchivedProject>> => {
+export const deleteProjectAction = userAction.inputSchema(z.string()).action(async ({parsedInput, ctx}): Promise<ServerActionResult<ArchivedProject>> => {
+    const project = await db.query.project.findFirst({
+        columns: {organizationId: true},
+        where: eq(drizzleDb.schemas.project.id, parsedInput),
+    });
+    await assertCanManageOrganization(ctx.user, project?.organizationId);
     try {
         const updatedProject = await archiveProjectService(parsedInput);
 

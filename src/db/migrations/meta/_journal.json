@@ -610,6 +610,41 @@
       "when": 1789228340905,
       "tag": "0086_happy_lily_hollister",
       "breakpoints": true
+    },
+    {
+      "idx": 87,
+      "version": "7",
+      "when": 1791021615000,
+      "tag": "0087_broken_songbird",
+      "breakpoints": true
+    },
+    {
+      "idx": 88,
+      "version": "7",
+      "when": 1791042323224,
+      "tag": "0088_fair_chamber",
+      "breakpoints": true
+    },
+    {
+      "idx": 89,
+      "version": "7",
+      "when": 1791052316392,
+      "tag": "0089_harsh_paladin",
+      "breakpoints": true
+    },
+    {
+      "idx": 90,
+      "version": "7",
+      "when": 1791057791112,
+      "tag": "0090_clean_triathlon",
+      "breakpoints": true
+    },
+    {
+      "idx": 91,
+      "version": "7",
+      "when": 1791057843708,
+      "tag": "0091_reflective_imperial_guard",
+      "breakpoints": true
     }
   ]
 }
