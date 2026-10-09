@@ -95,7 +95,7 @@ export function getFileHeadersBasedOnDbms(
       base = { "application/octet-stream": [".backup"] };
       break;
     case "mssql":
-      base = { "application/octet-stream": [".bacpac"] };
+      base = { "application/octet-stream": [".bacpac", ".dacpac"] };
       break;
     default:
       throw new Error(`Unsupported database type: ${dbType}`);
@@ -120,7 +120,7 @@ export function getArchiveEntryMatcher(dbType: string): RegExp {
     case "firebird":
       return /\.fbk$/i;
     case "mssql":
-      return /\.bacpac$/i;
+      return /\.(bacpac|dacpac)$/i;
     default:
       throw new Error(`Unsupported database type: ${dbType}`);
   }
