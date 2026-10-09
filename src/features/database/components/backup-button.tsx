@@ -12,6 +12,7 @@ import { ButtonWithConfirm } from "@/components/common/button-with-confirm";
 export type BackupButtonProps = {
   databaseId: string;
   disable: boolean;
+  isSync?: boolean;
 };
 
 export const BackupButton = (props: BackupButtonProps) => {
@@ -24,7 +25,9 @@ export const BackupButton = (props: BackupButtonProps) => {
       const backup = await backupButtonAction(databaseId);
       if (backup?.data?.success) {
         toast.success(
-          backup.data.actionSuccess?.message || "Backup created successfully!",
+          props.isSync
+            ? "Sync has been successfully requested."
+            : backup.data.actionSuccess?.message || "Backup created successfully!",
         );
         queryClient.invalidateQueries({
           queryKey: ["database-data", props.databaseId],
@@ -34,7 +37,7 @@ export const BackupButton = (props: BackupButtonProps) => {
         });
         router.refresh();
       } else {
-        toast.error(backup?.serverError || "Failed to create backup.");
+        toast.error(backup?.serverError || (props.isSync ? "Failed to request a sync." : "Failed to create backup."));
       }
     },
   });
@@ -44,18 +47,22 @@ export const BackupButton = (props: BackupButtonProps) => {
 
   return (
     <ButtonWithConfirm
-      title="Create Backup"
-      description={"Are you sure you want to create a backup?"}
+      title={props.isSync ? "Run Sync" : "Create Backup"}
+      description={
+        props.isSync
+          ? "Mirror the directory to its storages now? Files removed from the source are deleted from the replica."
+          : "Are you sure you want to create a backup?"
+      }
       button={{
         main: {
           disabled: props.disable,
-          text: isMobile ? "" : "Backup",
+          text: isMobile ? "" : props.isSync ? "Sync" : "Backup",
           variant: "default",
           icon: <DatabaseZap />,
         },
         confirm: {
           className: "w-full",
-          text: "Yes, create backup",
+          text: props.isSync ? "Yes, sync now" : "Yes, create backup",
           icon: <Check />,
           variant: "default",
           onClick: async () => {

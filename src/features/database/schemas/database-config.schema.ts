@@ -187,7 +187,8 @@ export const databaseFieldDefs: Record<EDbmsSchema, FieldDef[]> = {
     {
       ...f("options.exclude", "Exclude", "lines", "node_modules\n*.tmp\n/cache"),
       description:
-        "One pattern per line. Without a leading / it matches at any depth; with a leading / it is relative to Path.",
+        "One pattern per line. Without a leading / it matches at any depth; with a leading / it is relative to Path. " +
+        "With Sync, files matching a pattern are deleted from the replica on the next run.",
     },
     f("options.one_file_system", "Stay on one file system", "switch"),
   ],

@@ -1,6 +1,6 @@
 "use client";
 import {DatabaseBackupActionsModal} from "@/features/database/components/backup-actions-modal";
-import {DatabaseTabs, backupOnly} from "@/features/database/components/database-tabs";
+import {DatabaseTabs, isBackupOnly} from "@/features/database/components/database-tabs";
 import {Setting} from "@/db/schema/01_setting";
 import {DatabaseWith} from "@/db/schema/07_database";
 import {MemberWithUser} from "@/db/schema/03_organization";
@@ -25,7 +25,7 @@ import {HealthcheckLog} from "@/db/schema/15_healthcheck-log";
 import {Badge} from "@/components/ui/badge";
 import {LogsModal} from "@/features/logs/components/logs-modal";
 import {InfoTooltip} from "@/features/stats/components/info-tooltip";
-import {METHOD_LABELS} from "@/features/database/utils/backup-method";
+import {METHOD_DESCRIPTIONS, METHOD_LABELS, isSync} from "@/features/database/utils/backup-method";
 import {Alert, AlertDescription, AlertTitle} from "@/components/ui/alert";
 import {AlertCircleIcon} from "lucide-react";
 
@@ -105,9 +105,14 @@ export const DatabaseContent = (props: DatabaseContentProps) => {
                                 {database.dbms}
                             </Badge>
                             {database.dbms === "files" && (
-                                <Badge variant="outline" title="Set at creation">
-                                    {METHOD_LABELS[database.backupEngine]}
-                                </Badge>
+                                <>
+                                    <Badge variant="outline">
+                                        {METHOD_LABELS[database.backupEngine]}
+                                    </Badge>
+                                    <InfoTooltip
+                                        content={`${METHOD_DESCRIPTIONS[database.backupEngine]} Set at creation.`}
+                                    />
+                                </>
                             )}
                         </div>
                     </div>
@@ -133,7 +138,7 @@ export const DatabaseContent = (props: DatabaseContentProps) => {
                                     channels={activeOrganizationChannels}
                                     organizationId={props.organizationId}
                                     queryKey={["database-data", database.id]}
-                                    isBackupOnly={backupOnly.some((t) => database.dbms === t)}
+                                    isBackupOnly={isBackupOnly(database)}
                                 />
                                 <ChannelPoliciesModal
                                     scope={{type: "database", id: database.id}}
@@ -160,6 +165,7 @@ export const DatabaseContent = (props: DatabaseContentProps) => {
                                 <BackupButton
                                     disable={isAlreadyBackup || !database.lastContact || !!database.methodConflict}
                                     databaseId={database.id}
+                                    isSync={isSync(database)}
                                 />
                             </div>
                         </div>

@@ -35,7 +35,7 @@ import { Backup, BackupWith, Restoration } from "@/db/schema/07_database";
 import { BackupStorageWith } from "@/db/schema/14_storage-backup";
 import { isStorageAvailable } from "@/features/database/utils/backup-presence.logic";
 import { formatLocalizedDate, timeAgo } from "@/utils/date-formatting";
-import { formatBytes } from "@/utils/text";
+import { describeRun } from "@/features/database/utils/backup-method";
 import { ServerActionResult } from "@/types/action-type";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { AlertCircleIcon } from "lucide-react";
@@ -274,16 +274,9 @@ export const BackupActionsForm = ({
                            Last check: {checked}
                          </span>
 
-                         {storage.engine === "restic" && storage.status === "success" && (
+                         {describeRun(storage) && (
                            <span className="text-xs text-muted-foreground pl-7">
-                             +{storage.size === 0 ? "0 Bytes" : formatBytes(storage.size)} added
-                             {backup.fileSize ? ` (${formatBytes(backup.fileSize)} total)` : ""}
-                           </span>
-                         )}
-                         {storage.engine === "sync" && storage.status === "success" && (
-                           <span className="text-xs text-muted-foreground pl-7">
-                             {storage.filesTransferred ?? 0} file(s) transferred
-                             ({storage.size ? formatBytes(storage.size) : "0 Bytes"}), {storage.filesDeleted ?? 0} deleted
+                             {describeRun(storage)}
                            </span>
                          )}
                         </button>

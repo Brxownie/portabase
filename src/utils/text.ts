@@ -20,7 +20,7 @@ export function isImportedFilename(name: string): boolean {
 }
 
 export function formatBytes(bytes: number | null, decimals = 2): string {
-  if (!bytes) return "N/A";
+  if (bytes == null) return "N/A";
   if (bytes === 0) return "0 Bytes";
   const k = 1024;
   const dm = decimals < 0 ? 0 : decimals;
