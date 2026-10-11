@@ -2,8 +2,10 @@ import {NextResponse} from "next/server";
 import path from "path";
 import type {StorageInput} from "@/features/storages/types";
 import {dispatchStorage} from "@/features/storages/utils/storages.dispatch";
+import {verifyBackupToken} from "@/features/storages/utils/backup-url";
 import {Readable} from "node:stream";
 import {logger} from "@/lib/logger";
+import {env} from "@/env.mjs";
 
 const log = logger.child({module: "api/files/backups"});
 
@@ -23,20 +25,11 @@ export async function GET(
 
     const fileName = path.basename(pathFromUrl);
 
-    const crypto = require('crypto');
-    const expectedToken = crypto.createHash('sha256').update(`${fileName}${expires}`).digest('hex');
-    if (token !== expectedToken) {
+    const check = verifyBackupToken(fileName, expires, token, env.PROJECT_SECRET);
+    if (!check.ok) {
         return NextResponse.json(
-            {error: 'Invalid signed token'},
-            {status: 403}
-        );
-    }
-
-    const expiresAt = parseInt(expires!, 10);
-    if (Date.now() > expiresAt) {
-        return NextResponse.json(
-            {error: 'Signed token expired'},
-            {status: 403}
+            {error: `Invalid signed token: ${check.reason}`},
+            {status: check.reason === "missing" ? 400 : 403}
         );
     }
 
