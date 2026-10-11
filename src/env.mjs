@@ -123,7 +123,7 @@ export const env = createEnv({
         AUTH_SIGNUP_ENABLED: z.string().optional().default("true"),
         AUTH_PASSKEY_ENABLED: z.string().optional().default("false"),
 
-        AUTH_SYNC_OIDC_ROLES_ON_LOGIN: z.enum(["true", "false"]).default("true"),
+        AUTH_SYNC_OIDC_ROLES_ON_LOGIN: z.enum(["true", "false"]).default("false"),
         AUTH_ROLE_MAP: z.string().optional(),
         AUTH_DEFAULT_ROLE: z.string().optional().default("pending"),
         AUTH_ALLOW_LINKING: z.enum(["true", "false"]).default("true"),

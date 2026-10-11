@@ -207,16 +207,14 @@ export const auth = betterAuth({
         //@ts-ignore
         issuer: p.issuerUrl,
       })),
+      provisionUserOnEveryLogin:
+        env.AUTH_SYNC_OIDC_ROLES_ON_LOGIN === "true",
       provisionUser: async ({ user: usr, userInfo, provider }) => {
         const existingUser = await db.query.user.findFirst({
           where: eq(drizzleDb.schemas.user.email, usr.email),
         });
 
         if (existingUser && existingUser.role === "superadmin") {
-          return;
-        }
-
-        if (existingUser && env.AUTH_SYNC_OIDC_ROLES_ON_LOGIN === "false") {
           return;
         }
 
