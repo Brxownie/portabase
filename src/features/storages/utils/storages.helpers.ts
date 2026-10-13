@@ -14,6 +14,8 @@ import {eq} from "drizzle-orm";
 import {db} from "@/db";
 import {createHash} from "crypto";
 import {getServerUrl} from "@/utils/get-server-url";
+import {signBackupToken} from "@/features/storages/utils/backup-url";
+import {env} from "@/env.mjs";
 import path from "path";
 import {getBackupFolderName} from "@/utils/file-prefix";
 import {resolveStoragePolicies} from "@/features/database/utils/policy-resolution";
@@ -137,9 +139,8 @@ export async function generateFileUrl(input: { data: StorageGetInput | StorageUp
     });
 
     if (metadata.fileKind === "backups") {
-        const crypto = require("crypto");
         const expiresAt = Date.now() + 60 * 1000;
-        const token = crypto.createHash("sha256").update(`${fileName}${expiresAt}`).digest("hex");
+        const token = signBackupToken(fileName, expiresAt, env.PROJECT_SECRET);
 
         params.set("path", input.data.path);
         params.set("token", token);
