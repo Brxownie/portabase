@@ -84,6 +84,16 @@ You have 5 ways to install Portabase:
 
 See the [Database Servers documentation](https://portabase.io/docs/agent/db) for version-specific backup and restore details.
 
+## Funded Development
+
+Some Portabase features were developed thanks to organizations that funded their implementation. These features are fully open source and available to everyone under the Apache License 2.0.
+
+| Feature | Funded by | Released in |
+|:--------|:----------|:------------|
+| [MSSQL backups as DACPAC and restore over existing databases](https://github.com/Portabase/portabase/issues/519) | <a href="https://solydev.com/"><img src="/.github/assets/customers/solydev.png" height="28" alt="Solydev"/></a> | [Dashboard 1.32.0](https://github.com/Portabase/portabase/releases/tag/1.32.0) · [Agent 1.22.0](https://github.com/Portabase/agent-rust/releases/tag/1.22.0) |
+
+Need a specific feature? Portabase accepts funded development requests. [Contact us](mailto:contact@portabase.io).
+
 ## Contributing
 
 Want to contribute? See [CONTRIBUTING.md](.github/CONTRIBUTING.md) for guidelines.
