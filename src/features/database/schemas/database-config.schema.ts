@@ -45,8 +45,14 @@ export const MysqlConfigSchema = z.object({
   max_packet_size: z.string().optional().default("512M"),
 });
 export const MariadbConfigSchema = MysqlConfigSchema;
+const MssqlOptionsSchema = z
+  .object({
+    backup_format: z.enum(["dacpac", "bacpac"]).nullish(),
+  })
+  .optional();
+
 export const MssqlConfigSchema = z.object({
-  host, port, username, password, database: databaseName,
+  host, port, username, password, database: databaseName, options: MssqlOptionsSchema,
 });
 const MongoOptionsSchema = z
   .object({
@@ -132,13 +138,20 @@ const CLEAN_MODE: FieldDef = {
   ]),
   clearable: true,
 };
+const BACKUP_FORMAT: FieldDef = {
+  ...f("options.backup_format", "Backup format", "select", undefined, [
+    { value: "dacpac", label: "dacpac (agent default)" },
+    { value: "bacpac", label: "bacpac" },
+  ]),
+  clearable: true,
+};
 
 export const databaseFieldDefs: Record<EDbmsSchema, FieldDef[]> = {
   postgresql: [HOST, PORT, USER, PASS, DB, KEEP_OWNERSHIP, CLEAN_MODE],
   "postgresql-cluster": [HOST, PORT, USER, PASS, f("database", "Database", "text", "defaults to postgres"), KEEP_OWNERSHIP, CLEAN_MODE],
   mysql: [HOST, PORT, USER, PASS, DB, f("max_packet_size", "Max packet size", "text", "512M")],
   mariadb: [HOST, PORT, USER, PASS, DB, f("max_packet_size", "Max packet size", "text", "512M")],
-  mssql: [HOST, PORT, USER, PASS, DB],
+  mssql: [HOST, PORT, USER, PASS, DB, BACKUP_FORMAT],
   mongodb: [
     {
       ...HOST,

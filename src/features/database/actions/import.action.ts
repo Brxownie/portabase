@@ -58,7 +58,7 @@ export const uploadBackupAction = userAction
 
             let inspection;
             try {
-                inspection = await inspectUpload(buffer, database.dbms);
+                inspection = await inspectUpload(buffer, database.dbms, file.name);
             } catch (error) {
                 if (error instanceof InvalidUploadError) {
                     return {

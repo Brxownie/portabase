@@ -53,14 +53,24 @@ function listTarEntries(buffer: Buffer): Promise<string[]> {
   });
 }
 
+function rawUploadExtension(dbms: string, fileName: string): string {
+  if (dbms !== "mssql") return getFileExtension(dbms);
+  const match = getArchiveEntryMatcher(dbms).exec(fileName);
+  if (!match) {
+    throw new InvalidUploadError("MSSQL backup must be a .bacpac or .dacpac file.");
+  }
+  return match[0].toLowerCase();
+}
+
 export async function inspectUpload(
   buffer: Buffer,
   dbms: string,
+  fileName: string,
 ): Promise<InspectResult> {
   log.info({ dbms, size: buffer.length }, "Inspecting uploaded backup");
 
   if (!isGzip(buffer)) {
-    const innerName = `backup${getFileExtension(dbms)}`;
+    const innerName = `backup${rawUploadExtension(dbms, fileName)}`;
     log.info(
       { dbms, innerName },
       "Native (non-gzip) upload, will wrap into tar.gz before storing",
