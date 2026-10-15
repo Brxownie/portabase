@@ -9,27 +9,17 @@ import {dispatchStorage} from "@/features/storages/utils/storages.dispatch";
 import {v4 as uuidv4} from "uuid";
 import {getTodayISODate} from "@/utils/date-formatting";
 import {withUpdatedAt} from "@/db/utils";
-import {getBackupFolderName} from "@/utils/file-prefix";
+import {getBackupExtension, getBackupFolderName} from "@/utils/file-prefix";
 
-/**
- * Full extension of a stored backup file (".tar.gz", ".tar.gz.enc", ".sql", ...).
- * The agent picks how to unpack a restore (decrypt or not) from this extension,
- * so a migrated copy must keep the source's one.
- */
-function getBackupExtension(path: string): string {
-    const fileName = path.split("/").pop() ?? "";
-    const dotIndex = fileName.indexOf(".");
-    return dotIndex > 0 ? fileName.slice(dotIndex) : ".tar.gz";
-}
 
 export const migrationAction = userAction.inputSchema(
     z.object({
         targetDatabaseId: z.string(),
         backupIds: z.array(z.string()),
     })
-).action(async ({ parsedInput }): Promise<ServerActionResult<{}>> => {
+).action(async ({parsedInput}): Promise<ServerActionResult<{}>> => {
 
-    const { targetDatabaseId, backupIds } = parsedInput;
+    const {targetDatabaseId, backupIds} = parsedInput;
 
     let hasError = false;
 
@@ -137,7 +127,7 @@ export const migrationAction = userAction.inputSchema(
                                 )
                                 .where(eq(drizzleDb.schemas.backupStorage.id, backupStorage.id));
 
-                            return { success: true };
+                            return {success: true};
 
                         } catch (error) {
 
@@ -152,7 +142,7 @@ export const migrationAction = userAction.inputSchema(
                                 )
                                 .where(eq(drizzleDb.schemas.backupStorage.id, backupStorage.id));
 
-                            return { success: false };
+                            return {success: false};
                         }
                     })
                 );

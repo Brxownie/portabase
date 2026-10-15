@@ -33,3 +33,10 @@ export function getBackupFolderName() {
 }
 
 export const backupFolderName = escapeRegExp(getBackupFolderName());
+
+
+export function getBackupExtension(path: string): string {
+    const fileName = path.split("/").pop() ?? "";
+    const dotIndex = fileName.indexOf(".");
+    return dotIndex > 0 ? fileName.slice(dotIndex) : ".tar.gz";
+}
